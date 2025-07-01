@@ -20,7 +20,7 @@ func New() (*PostgreSQL, error) {
 	// and use it to connect to the database.
 	// Replace the nil with actual DB connection logic.
 	// Example:
-	connstr := "postgres://avnadmin:AVNS_LA8Kt-EcxovItZovy6d@pg-23ca3a85-voicecalllappp.g.aivencloud.com:26205/defaultdb?sslmode=require"
+	connstr := ""
 	conn, err := pgxpool.New(context.Background(), connstr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
