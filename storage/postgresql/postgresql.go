@@ -20,7 +20,7 @@ func New() (*PostgreSQL, error) {
 	// and use it to connect to the database.
 	// Replace the nil with actual DB connection logic.
 	// Example:
-	connstr := ""
+	connstr := "postgres://avnadmin:AVNS_LA8Kt-EcxovItZovy6d@pg-23ca3a85-voicecalllappp.g.aivencloud.com:26205/defaultdb?sslmode=require"
 	conn, err := pgxpool.New(context.Background(), connstr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
@@ -71,7 +71,6 @@ func New() (*PostgreSQL, error) {
 func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error) {
 	// This function should check if the user exists in the database.
 	// If the user exists, return userDetailsWithJWTtoken, otherwise return false.
-
 	var userEmail string
 	var user types.User
 	fmt.Println("Checking user in database:", email)
@@ -83,10 +82,25 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 			return false, user, nil // User not found
 		}
 	}
+
 	return true, user, nil
 }
 
-func (p *PostgreSQL) SaveUserInDatabase(user types.User) error {
+func (p *PostgreSQL) CheckUsernameIsAvailable(username string) bool {
+	checkQuery := `SELECT email FROM users WHERE username = $1;`
+	var output string
+	p.Db.QueryRow(context.Background(), checkQuery, username).Scan(&output)
+
+	if output == "" {
+		fmt.Println("Username is available:", username)
+		return true // Username is available
+	}
+
+	return false
+
+}
+
+func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 	// This function should save the user in the database.
 	// If the user is saved successfully, return nil, otherwise return an error.
 
@@ -94,13 +108,13 @@ func (p *PostgreSQL) SaveUserInDatabase(user types.User) error {
 	insertQuery := `INSERT INTO users (full_name, username, email, age,gender,interests, profile_pic,password, auth_type)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;`
 
-	var id int
-	err := p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, user.Password, user.AuthType).Scan(&id)
+	// var id int
+	err := p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, user.Password, user.AuthType).Scan(&user.Id)
 	if err != nil {
 		fmt.Println("Error inserting user:", err)
 		return fmt.Errorf("failed to insert user: %v", err)
 	}
-	fmt.Println("User saved successfully with ID:", id)
+	fmt.Println("User saved successfully with ID:", user.Id)
 
 	// Here you would typically execute an INSERT statement to save the user.
 	// For now, we will just return nil to indicate success.
@@ -114,6 +128,17 @@ func (p *PostgreSQL) StoreToken(user types.User, token string) error {
 	if err != nil {
 		fmt.Println("Error storing token:", err)
 		return fmt.Errorf("failed to store token: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgreSQL) DeleteToken(userid int64) error {
+	query := `DELETE FROM refresh_tokens WHERE id = $1;`
+	_, err := p.Db.Exec(context.Background(), query, userid)
+	if err != nil {
+		// fmt.Println("Error deleting token:", err)
+		// return fmt.Errorf("failed to delete token: %v", err)
+		fmt.Println("token not found for user ID:", userid)
 	}
 	return nil
 }

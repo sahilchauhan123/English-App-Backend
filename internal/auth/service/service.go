@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github/english-app/internal/types"
 	"github/english-app/storage"
+	"github/english-app/storage/redis"
 	"os"
 	"time"
 
@@ -91,7 +92,7 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 		Password:   "",       // Password is not required for Google auth
 	}
 	// It should save the user information in the database.
-	err = db.SaveUserInDatabase(user)
+	err = db.SaveUserInDatabase(&user)
 	if err != nil {
 		return AuthResponse, err
 	}
@@ -104,9 +105,14 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 	return AuthResponse, nil
 }
 
-func HandleEmailUserCreation(user types.User, db storage.Storage) (types.AuthResponse, error) {
+func HandleEmailUserCreation(user *types.User, db storage.Storage) (types.AuthResponse, error) {
 	var AuthResponse types.AuthResponse
 	//check already in db
+	isUserNameAvaibale := db.CheckUsernameIsAvailable(user.Username)
+	if !isUserNameAvaibale {
+		return AuthResponse, fmt.Errorf("username already exists")
+	}
+
 	isAlreadyAvailable, _, _ := db.CheckUserInDatabase(user.Email)
 	if isAlreadyAvailable {
 		return AuthResponse, fmt.Errorf("user already exists")
@@ -118,4 +124,42 @@ func HandleEmailUserCreation(user types.User, db storage.Storage) (types.AuthRes
 		return AuthResponse, fmt.Errorf("error saving user in database")
 	}
 	return AuthResponse, nil
+}
+
+func HandleEmailLogin(email string, password string, db storage.Storage, redisclient *redis.RedisClient) (types.AuthResponse, error) {
+
+	var AuthResponse types.AuthResponse
+	//check user in db
+	isAvailable, user, err := db.CheckUserInDatabase(email)
+	if err != nil {
+		AuthResponse.Message = "Error checking user in database"
+		return AuthResponse, fmt.Errorf("error checking user in database: %v", err)
+	}
+	if !isAvailable {
+		AuthResponse.Message = "User not found in database, please register"
+		return AuthResponse, fmt.Errorf("user not found in database")
+	}
+	//check AuthType
+	if user.AuthType != "email" {
+		AuthResponse.Message = "User is not registered with email authentication"
+		return AuthResponse, fmt.Errorf("user is not registered with email authentication")
+	}
+	//check password
+	if user.Password != password {
+		AuthResponse.Message = "Incorrect password"
+		return AuthResponse, fmt.Errorf("incorrect password")
+	}
+
+	// delete the Refresh token
+	_ = db.DeleteToken(user.Id)
+	// delete the Access token
+	redisclient.Client.Del(context.Background(), fmt.Sprintf("access_token:%d", user.Id))
+
+	AuthResponse = types.AuthResponse{
+		IsRegistered: true,
+		User:         user,
+		Message:      "Login successful",
+	}
+	return AuthResponse, nil
+
 }

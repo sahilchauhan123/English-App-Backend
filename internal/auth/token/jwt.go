@@ -1,6 +1,7 @@
 package token
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -21,6 +22,7 @@ type CustomClaims struct {
 }
 
 func (j *JWTMaker) CreateToken(userID int64, email string, duration time.Duration) (string, error) {
+	fmt.Println("Creating token for userID:", userID, "with email:", email, "and duration:", duration)
 	claims := CustomClaims{
 		UserId: userID,
 		Email:  email,

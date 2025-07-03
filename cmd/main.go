@@ -29,9 +29,9 @@ func main() {
 	{
 		authGroup.POST("/logingoogle", authhandler.GoogleLoginHandler(storage, jwtMaker, redisClient))
 		authGroup.POST("/creategoogleuser", authhandler.GoogleCreateHandler(storage, jwtMaker, redisClient)) // Assuming this is the same handler for creating a user
-		// authGroup.POST("/emaillogin", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
+		authGroup.POST("/emaillogin", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
 		authGroup.POST("/createemailuser", authhandler.EmailCreateHandler(storage, jwtMaker, redisClient))
-
+		authGroup.GET("/checkuser", authhandler.CheckUsernameIsAvailable(storage))
 	}
 	r.Run(":8082") // listen and serve on
 }

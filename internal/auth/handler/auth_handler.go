@@ -27,6 +27,20 @@ type GoogleLoginRequest struct {
 	IDToken string `json:"id_token" binding:"required"`
 }
 
+type EmailLoginRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// type CheckUser struct {
+// 	Username string `json:"username" binding:"required"`
+// }
+
+type Res struct {
+	IsRegistered bool   `json:"is_registered"`
+	Message      string `json:"message"`
+}
+
 func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req GoogleLoginRequest
@@ -118,7 +132,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 			return
 		}
 
-		authResponse, err = authservice.HandleEmailUserCreation(user, db)
+		authResponse, err = authservice.HandleEmailUserCreation(&user, db)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("user creation failed %v", err).Error())
 			return
@@ -156,6 +170,86 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 
 		response.Success(c, authResponse)
 		// return
+	}
+}
+
+func CheckUsernameIsAvailable(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		username := c.Query("username")
+
+		if username == "" {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+
+		isAvailable := db.CheckUsernameIsAvailable(username)
+		if !isAvailable {
+			res := Res{
+				IsRegistered: true,
+				Message:      "Username is already taken",
+			}
+			response.Success(c, res)
+			return
+		}
+		res := Res{
+			IsRegistered: false,
+			Message:      "Username is available",
+		}
+
+		response.Success(c, res)
+	}
+}
+
+func EmailLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req EmailLoginRequest
+
+		//validate the request body
+		err := c.ShouldBindJSON(&req)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+
+		// Handle Email login
+		authResponse, err := authservice.HandleEmailLogin(req.Email, req.Password, db, redisClient)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, fmt.Errorf("error handling email login: %v", err).Error())
+			return
+		}
+
+		// TOKENS CREATIONS
+		//ACCESS TOKEN
+		token, err := jwtMaker.CreateToken(authResponse.User.Id, authResponse.User.Email, time.Hour*24*3)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, "Failed to create access token")
+			return
+		}
+		// STORE TO REDIS
+		err = redisClient.Client.Set(ctx, fmt.Sprintf("access_token:%d", authResponse.User.Id), token, time.Hour*24*3).Err()
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("failed to store access token in redis: %v", err).Error())
+			return
+		}
+
+		//REFRESH TOKEN
+		refreshToken, err := jwtMaker.CreateToken(authResponse.User.Id, authResponse.User.Email, time.Hour*24*90)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("Failed to create refresh token: %v", err).Error())
+			return
+		}
+		// STORE TO POSTGRESQL
+		err = db.StoreToken(authResponse.User, refreshToken)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("Failed to store refresh token in PostgreSQL: %v", err).Error())
+			return
+		}
+
+		authResponse.RefreshToken = refreshToken
+		authResponse.AccessToken = token
+
+		response.Success(c, authResponse)
 	}
 }
 
