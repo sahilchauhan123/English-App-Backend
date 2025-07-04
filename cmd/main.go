@@ -6,6 +6,7 @@ import (
 	"github/english-app/internal/auth/token"
 	"github/english-app/storage/postgresql"
 	"github/english-app/storage/redis"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -18,7 +19,11 @@ func main() {
 		fmt.Println("Error loading .env file")
 		return
 	}
-	jwtMaker := token.NewJWTMaker("3232jfh793232sds")
+	jwtMaker := token.NewJWTMaker(os.Getenv("JWTTOKEN_SECRET"))
+	if jwtMaker == nil {
+		fmt.Println("Error creating JWT maker")
+		return
+	}
 
 	storage, err := postgresql.New()
 	if err != nil {
