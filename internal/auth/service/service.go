@@ -2,15 +2,31 @@ package authservice
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github/english-app/internal/smtp"
 	"github/english-app/internal/types"
 	"github/english-app/storage"
 	"github/english-app/storage/redis"
+	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	"google.golang.org/api/idtoken"
 )
+
+type EmailPassWordReset struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	OTP      string `json:"otp" binding:"required"`
+}
+
+func generateRandomNumber() string {
+	// Generate a random number between 1000 and 9999 (inclusive)
+	num := rand.Intn(9000) + 1000
+	return strconv.Itoa(num)
+}
 
 func validateIdToken(IDToken string) (*idtoken.Payload, error) {
 	payload, err := idtoken.Validate(context.Background(), IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
@@ -162,4 +178,74 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 	}
 	return AuthResponse, nil
 
+}
+
+func HandlePasswordForget(email string, password string, db storage.Storage, redis *redis.RedisClient) error {
+	// check user exists or not
+	// if exists then check auth type should be email
+	isAvailable, userData, err := db.CheckUserInDatabase(email)
+
+	if !isAvailable {
+		return fmt.Errorf("user not found in database")
+	}
+	if err != nil {
+		return fmt.Errorf(err.Error())
+	}
+
+	if userData.AuthType != "email" {
+		return fmt.Errorf("user is not registered with email authentication")
+	}
+	handleOTPStore(email, password, redis)
+
+	return nil
+}
+
+func handleOTPStore(email string, password string, redis *redis.RedisClient) error {
+	// This function should handle the OTP storage logic.
+	// It should store the OTP in the database or any other storage.
+	// For now, we will just return nil to indicate success.
+	// In a real application, you would implement the actual logic here.
+
+	var EmailPassWordReset EmailPassWordReset
+	EmailPassWordReset.Email = email
+	EmailPassWordReset.Password = password
+	EmailPassWordReset.OTP = generateRandomNumber() // Generate a random 6-digit OTP
+	data, err := json.Marshal(EmailPassWordReset)
+	if err != nil {
+		return err
+	}
+	redis.Client.Set(context.Background(), fmt.Sprintf("reset_password:%s", email), data, time.Minute*5)
+	err = smtp.SendEmailOTP(EmailPassWordReset.Email, EmailPassWordReset.OTP)
+
+	if err != nil {
+		fmt.Println("Error sending email OTP:", err)
+		return err
+	}
+
+	return nil
+
+}
+
+func HandlePasswordReset(email string, otp string, db storage.Storage, redis redis.RedisClient) error {
+	// check email in redis if available fetch its data from redis
+	// check Otp should be same
+	var otpData EmailPassWordReset
+	val, err := redis.Client.Get(context.Background(), fmt.Sprintf("reset_password:%s", email)).Result()
+	if err != nil {
+		return fmt.Errorf("OTP not found or expired")
+	}
+	err = json.Unmarshal([]byte(val), &otpData)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling OTP data: %v", err)
+	}
+
+	if otpData.OTP != otp {
+		return fmt.Errorf("invalid OTP")
+	}
+
+	err = db.ChangePassword(email, otpData.Password)
+	if err != nil {
+		return fmt.Errorf("error changing password: %v", err)
+	}
+	return nil
 }

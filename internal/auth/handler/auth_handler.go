@@ -17,10 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// type Authhandler struct{
-// 	AuthService *service
-// }
-
 var ctx = context.Background()
 
 type GoogleLoginRequest struct {
@@ -32,13 +28,20 @@ type EmailLoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-// type CheckUser struct {
-// 	Username string `json:"username" binding:"required"`
-// }
-
 type Res struct {
 	IsRegistered bool   `json:"is_registered"`
 	Message      string `json:"message"`
+}
+
+type EmailPassWordForget struct {
+	Email           string `json:"email" binding:"required"`
+	Password        string `json:"password" binding:"required"`
+	ConfirmPassword string `json:"confirm_password" binding:"required"`
+}
+
+type EmailPassWordReset struct {
+	Email string `json:"email" binding:"required"`
+	Otp   string `json:"otp" binding:"required"`
 }
 
 func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
@@ -173,7 +176,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 	}
 }
 
-func CheckUsernameIsAvailable(db storage.Storage) gin.HandlerFunc {
+func CheckUsernameIsAvailable(db storage.Storage, redis *redis.RedisClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		username := c.Query("username")
@@ -253,4 +256,40 @@ func EmailLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient
 	}
 }
 
-//comment
+func ForgetPasswordHandler(db storage.Storage, redis *redis.RedisClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var passwordReset EmailPassWordForget
+		err := c.ShouldBindJSON(&passwordReset)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+		if passwordReset.Password != passwordReset.ConfirmPassword {
+			response.Failed(c, http.StatusBadRequest, "Passwords do not match")
+			return
+		}
+		err = authservice.HandlePasswordForget(passwordReset.Email, passwordReset.Password, db, redis)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("error handling password reset: %v", err).Error())
+			return
+		}
+		response.Success(c, "Password reset successful, please check your email for the OTP")
+	}
+}
+
+func ResetPasswordHandler(db storage.Storage, redis *redis.RedisClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var passwordReset EmailPassWordReset
+		err := c.ShouldBindJSON(&passwordReset)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+
+		err = authservice.HandlePasswordReset(passwordReset.Email, passwordReset.Otp, db, *redis)
+		if err != nil {
+			response.Failed(c, http.StatusUnauthorized, err.Error())
+		}
+		response.Success(c, "Password Reset Successfull Please login now")
+	}
+}

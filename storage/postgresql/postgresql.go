@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github/english-app/internal/types"
+	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,7 +21,7 @@ func New() (*PostgreSQL, error) {
 	// and use it to connect to the database.
 	// Replace the nil with actual DB connection logic.
 	// Example:
-	connstr := "postgres://avnadmin:AVNS_LA8Kt-EcxovItZovy6d@pg-23ca3a85-voicecalllappp.g.aivencloud.com:26205/defaultdb?sslmode=require"
+	connstr := os.Getenv("POSTGRES_URL")
 	conn, err := pgxpool.New(context.Background(), connstr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
@@ -140,5 +141,16 @@ func (p *PostgreSQL) DeleteToken(userid int64) error {
 		// return fmt.Errorf("failed to delete token: %v", err)
 		fmt.Println("token not found for user ID:", userid)
 	}
+	return nil
+}
+
+func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
+	query := `UPDATE users SET password = $1 WHERE email = $2;`
+	_, err := p.Db.Exec(context.Background(), query, newPassword, email)
+	if err != nil {
+		fmt.Println("Error changing password:", err)
+		return fmt.Errorf("failed to change password: %v", err)
+	}
+	fmt.Println("Password changed successfully for email:", email)
 	return nil
 }

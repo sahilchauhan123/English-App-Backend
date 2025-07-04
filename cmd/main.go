@@ -8,10 +8,16 @@ import (
 	"github/english-app/storage/redis"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	fmt.Println("server running...")
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env file")
+		return
+	}
 	jwtMaker := token.NewJWTMaker("3232jfh793232sds")
 
 	storage, err := postgresql.New()
@@ -31,7 +37,9 @@ func main() {
 		authGroup.POST("/creategoogleuser", authhandler.GoogleCreateHandler(storage, jwtMaker, redisClient)) // Assuming this is the same handler for creating a user
 		authGroup.POST("/emaillogin", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
 		authGroup.POST("/createemailuser", authhandler.EmailCreateHandler(storage, jwtMaker, redisClient))
-		authGroup.GET("/checkuser", authhandler.CheckUsernameIsAvailable(storage))
+		authGroup.GET("/checkuser", authhandler.CheckUsernameIsAvailable(storage, redisClient))
+		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
+		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 	}
 	r.Run(":8082") // listen and serve on
 }

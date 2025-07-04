@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -15,9 +16,9 @@ type RedisClient struct {
 
 func New() (*RedisClient, error) {
 	conn := redis.NewClient(&redis.Options{
-		Addr:     "redis-19433.c240.us-east-1-3.ec2.redns.redis-cloud.com:19433", // Redis server address
-		Password: "sEOfYdii9huc4aqsRouD5vI1RdJzTb28",                             // No password set
-		DB:       0,                                                              // Use default DB
+		Addr:     os.Getenv("REDIS_ADDR"),     // Redis server address
+		Password: os.Getenv("REDIS_PASSWORD"), // No password set
+		DB:       0,                           // Use default DB
 	})
 	// Ping the Redis server to check if the connection is successful
 	_, err := conn.Ping(ctx).Result()

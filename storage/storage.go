@@ -8,4 +8,5 @@ type Storage interface {
 	StoreToken(user types.User, token string) error
 	CheckUsernameIsAvailable(username string) bool
 	DeleteToken(userId int64) error
+	ChangePassword(email string, newPassword string) error
 }
