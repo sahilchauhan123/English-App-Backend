@@ -46,5 +46,9 @@ func main() {
 		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
 		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 	}
-	r.Run(":8080") // listen and serve on
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // fallback for local dev
+	}
+	r.Run(":" + port) // Gin binds to specified port
 }
