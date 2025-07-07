@@ -14,11 +14,11 @@ import (
 
 func main() {
 	fmt.Println("server running...")
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file")
-		return
-	}
+	_ = godotenv.Load()
+	// if err != nil {
+	// 	fmt.Println("Error loading .env file")
+	// 	return
+	// }
 	jwtMaker := token.NewJWTMaker(os.Getenv("JWTTOKEN_SECRET"))
 	if jwtMaker == nil {
 		fmt.Println("Error creating JWT maker")
@@ -46,5 +46,5 @@ func main() {
 		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
 		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 	}
-	r.Run(":8082") // listen and serve on
+	r.Run(":8080") // listen and serve on
 }

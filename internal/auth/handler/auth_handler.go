@@ -170,6 +170,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		authResponse.User = user
 		authResponse.AccessToken = token
 		authResponse.RefreshToken = refreshToken
+		authResponse.Message = "User created successfully"
 
 		response.Success(c, authResponse)
 		// return
@@ -289,6 +290,7 @@ func ResetPasswordHandler(db storage.Storage, redis *redis.RedisClient) gin.Hand
 		err = authservice.HandlePasswordReset(passwordReset.Email, passwordReset.Otp, db, *redis)
 		if err != nil {
 			response.Failed(c, http.StatusUnauthorized, err.Error())
+			return
 		}
 		response.Success(c, "Password Reset Successfull Please login now")
 	}

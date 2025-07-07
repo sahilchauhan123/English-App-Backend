@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/idtoken"
 )
 
@@ -103,9 +104,9 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 		Email:      payload.Claims["email"].(string),
 		Interests:  body.Interests,
 		Age:        body.Age,
-		CreatedAt:  time.Now(),
-		AuthType:   "google", // Assuming the auth type is google
-		Password:   "",       // Password is not required for Google auth
+		// CreatedAt:  time.Now(),
+		AuthType: "google", // Assuming the auth type is google
+		Password: "",       // Password is not required for Google auth
 	}
 	// It should save the user information in the database.
 	err = db.SaveUserInDatabase(&user)
@@ -161,7 +162,13 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 		return AuthResponse, fmt.Errorf("user is not registered with email authentication")
 	}
 	//check password
-	if user.Password != password {
+	hashedPassWord, err := HashPassword(password)
+
+	if err != nil {
+		AuthResponse.Message = "Error hashing password"
+		return AuthResponse, fmt.Errorf("error hashing password: %v", err)
+	}
+	if user.Password != hashedPassWord {
 		AuthResponse.Message = "Incorrect password"
 		return AuthResponse, fmt.Errorf("incorrect password")
 	}
@@ -231,8 +238,9 @@ func HandlePasswordReset(email string, otp string, db storage.Storage, redis red
 	// check Otp should be same
 	var otpData EmailPassWordReset
 	val, err := redis.Client.Get(context.Background(), fmt.Sprintf("reset_password:%s", email)).Result()
+	fmt.Println("value coming from redis : ", val)
 	if err != nil {
-		return fmt.Errorf("OTP not found or expired")
+		return fmt.Errorf("OTP not found or expired %e", err)
 	}
 	err = json.Unmarshal([]byte(val), &otpData)
 	if err != nil {
@@ -248,4 +256,9 @@ func HandlePasswordReset(email string, otp string, db storage.Storage, redis red
 		return fmt.Errorf("error changing password: %v", err)
 	}
 	return nil
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }

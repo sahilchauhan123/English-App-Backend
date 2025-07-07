@@ -1,9 +1,5 @@
 package types
 
-import (
-	"time"
-)
-
 // type GoogleUser struct {
 // 	FullName   string    `json:"full_name" binding:"required"`
 // 	Username   string    `json:"username" binding:"required"`
@@ -19,17 +15,17 @@ import (
 // }
 
 type User struct {
-	Id         int64     `json:"id"` // Set by DB
-	FullName   string    `json:"full_name" binding:"required"`
-	Username   string    `json:"username" binding:"required"`
-	Email      string    `json:"email" binding:"required,email"`
-	Password   string    `json:"password,omitempty"` // Only used in local auth
-	Age        string    `json:"age" binding:"required"`
-	Gender     string    `json:"gender" binding:"required"`
-	Interests  []string  `json:"interests" binding:"required"`
-	ProfilePic string    `json:"profile_pic" binding:"required,url"`
-	AuthType   string    `json:"auth_type" binding:"required"` // "google" or "email"
-	CreatedAt  time.Time `json:"created_at"`                   // Set on backend
+	Id         int64    `json:"id"` // Set by DB
+	FullName   string   `json:"full_name" binding:"required"`
+	Username   string   `json:"username" binding:"required"`
+	Email      string   `json:"email" binding:"required,email"`
+	Password   string   `json:"password,omitempty"` // Only used in local auth
+	Age        string   `json:"age" binding:"required"`
+	Gender     string   `json:"gender" binding:"required"`
+	Interests  []string `json:"interests" binding:"required"`
+	ProfilePic string   `json:"profile_pic" binding:"required,url"`
+	AuthType   string   `json:"auth_type" binding:"required"` // "google" or "email"
+	CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
 }
 
 type AuthResponse struct {
