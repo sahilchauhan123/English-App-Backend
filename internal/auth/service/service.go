@@ -161,18 +161,12 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 		AuthResponse.Message = "User is not registered with email authentication"
 		return AuthResponse, fmt.Errorf("user is not registered with email authentication")
 	}
-	//check password
-	hashedPassWord, err := HashPassword(password)
 
-	if err != nil {
-		AuthResponse.Message = "Error hashing password"
-		return AuthResponse, fmt.Errorf("error hashing password: %v", err)
+	matched := matchHashedPasswords(user.Password, password)
+	if !matched {
+		AuthResponse.Message = "Invalid password"
+		return AuthResponse, fmt.Errorf("invalid password")
 	}
-	if user.Password != hashedPassWord {
-		AuthResponse.Message = "Incorrect password"
-		return AuthResponse, fmt.Errorf("incorrect password")
-	}
-
 	// delete the Refresh token
 	_ = db.DeleteToken(user.Id)
 	// delete the Access token
@@ -187,6 +181,14 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 
 }
 
+func matchHashedPasswords(hashedPassWord, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassWord), []byte(password))
+	if err != nil {
+		return false // Passwords do not match
+	}
+
+	return true
+}
 func HandlePasswordForget(email string, password string, db storage.Storage, redis *redis.RedisClient) error {
 	// check user exists or not
 	// if exists then check auth type should be email

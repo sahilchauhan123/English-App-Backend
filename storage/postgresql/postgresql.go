@@ -155,8 +155,13 @@ func (p *PostgreSQL) DeleteToken(userid int64) error {
 }
 
 func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
+
+	password, err := authservice.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
 	query := `UPDATE users SET password = $1 WHERE email = $2;`
-	_, err := p.Db.Exec(context.Background(), query, newPassword, email)
+	_, err = p.Db.Exec(context.Background(), query, password, email)
 	if err != nil {
 		fmt.Println("Error changing password:", err)
 		return fmt.Errorf("failed to change password: %v", err)
