@@ -4,6 +4,7 @@ import (
 	"fmt"
 	authhandler "github/english-app/internal/auth/handler"
 	"github/english-app/internal/auth/token"
+	"github/english-app/internal/signalling"
 	"github/english-app/storage/postgresql"
 	"github/english-app/storage/redis"
 	"os"
@@ -46,6 +47,8 @@ func main() {
 		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
 		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 	}
+	r.GET("/ws", signalling.HandleWebSocket)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080" // fallback for local dev

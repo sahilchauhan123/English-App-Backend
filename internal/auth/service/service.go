@@ -148,6 +148,7 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 	var AuthResponse types.AuthResponse
 	//check user in db
 	isAvailable, user, err := db.CheckUserInDatabase(email)
+	fmt.Println("userdata : ", user)
 	if err != nil {
 		AuthResponse.Message = "Error checking user in database"
 		return AuthResponse, fmt.Errorf("error checking user in database: %v", err)

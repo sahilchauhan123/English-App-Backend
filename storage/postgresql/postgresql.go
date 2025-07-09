@@ -72,11 +72,10 @@ func New() (*PostgreSQL, error) {
 func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error) {
 	// This function should check if the user exists in the database.
 	// If the user exists, return userDetailsWithJWTtoken, otherwise return false.
-	var userEmail string
 	var user types.User
 	fmt.Println("Checking user in database:", email)
 	checkQuery := `SELECT id,full_name, username, email, age,gender,interests, profile_pic , created_at,password,auth_type FROM users WHERE email = $1;`
-	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(&user.Id, &user.FullName, &user.Username, &userEmail, &user.Age, &user.Gender, &user.Interests, &user.ProfilePic, &user.CreatedAt, &user.Password, &user.AuthType)
+	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(&user.Id, &user.FullName, &user.Username, &user.Email, &user.Age, &user.Gender, &user.Interests, &user.ProfilePic, &user.CreatedAt, &user.Password, &user.AuthType)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			fmt.Println("User not found in database")
