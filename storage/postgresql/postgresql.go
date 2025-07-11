@@ -53,10 +53,17 @@ func New() (*PostgreSQL, error) {
 		id INT PRIMARY KEY,
 		refresh_token TEXT NOT NULL
 	);`
+
 	_, err = conn.Exec(context.Background(), createTableQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
+	createTableQuery = `
+	CREATE TABLE call_details IF NOT EXISTS(
+
+
+	);`
+
 	err = conn.Ping(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
@@ -165,4 +172,10 @@ func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
 	}
 	fmt.Println("Password changed successfully for email:", email)
 	return nil
+}
+
+func (p *PostgreSQL) InsertCall(peer1, peer2 string) error {
+
+	query := `INSERT INTO call_details (peer1 , peer2) VALUES ($1,$2);`
+	p.Db.Query(context.Background(), query, peer1, peer2)
 }

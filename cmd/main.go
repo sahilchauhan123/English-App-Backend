@@ -47,7 +47,7 @@ func main() {
 		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
 		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 	}
-	r.GET("/ws", signalling.HandleWebSocket)
+	r.GET("/ws", signalling.HandleWebSocket(storage))
 
 	port := os.Getenv("PORT")
 	if port == "" {

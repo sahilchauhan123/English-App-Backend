@@ -2,6 +2,7 @@ package signalling
 
 import (
 	"fmt"
+	"github/english-app/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +15,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func HandleWebSocket(c *gin.Context) {
-	fmt.Println("getting there ")
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		return
-	}
+func HandleWebSocket(storage *storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		fmt.Println("getting there ")
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			return
+		}
 
-	go handleClient(conn)
+		go handleClient(conn, storage)
+	}
 }
