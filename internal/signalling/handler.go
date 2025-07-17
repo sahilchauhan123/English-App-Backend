@@ -15,7 +15,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func HandleWebSocket(storage *storage.Storage) gin.HandlerFunc {
+func HandleWebSocket(storage storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		fmt.Println("getting there ")
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)

@@ -37,7 +37,7 @@ func New() (*PostgreSQL, error) {
 			age TEXT NOT NULL,
 			gender TEXT NOT NULL,
 			interests TEXT[] NOT NULL,
-			created_at TEXT DEFAULT NOW(),
+			created_at TIMESTAMPZ DEFAULT NOW(),
 			profile_pic TEXT NOT NULL,
 			password TEXT NOT NULL,
 			auth_type TEXT NOT NULL
@@ -59,10 +59,18 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
 	createTableQuery = `
-	CREATE TABLE call_details IF NOT EXISTS(
-
-
+	CREATE TABLE IF NOT EXISTS call_sessions (
+    	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
+    	peer1_id BIGINT NOT NULL,
+    	peer2_id BIGINT NOT NULL,
+    	started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    	ended_at TIMESTAMPTZ, -- Made nullable, remove DEFAULT now()
+    	status TEXT DEFAULT 'ongoing'  -- optional: 'ended', etc.
 	);`
+	_, err = conn.Exec(context.Background(), createTableQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create call_sessions table: %v", err)
+	}
 
 	err = conn.Ping(context.Background())
 	if err != nil {
@@ -123,6 +131,7 @@ func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at;`
 	// var id int
 	var created_at pgtype.Timestamptz
+
 	err = p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, hashedPassword, user.AuthType).Scan(&user.Id, &created_at)
 	if err != nil {
 		fmt.Println("Error inserting user:", err)
@@ -174,8 +183,22 @@ func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
 	return nil
 }
 
-func (p *PostgreSQL) InsertCall(peer1, peer2 string) error {
-
-	query := `INSERT INTO call_details (peer1 , peer2) VALUES ($1,$2);`
-	p.Db.Query(context.Background(), query, peer1, peer2)
+func (p *PostgreSQL) StartCall(peer1, peer2 int64) (string, error) {
+	var id string
+	query := `INSERT INTO call_sessions (peer1 , peer2) VALUES ($1,$2) RETURNING id;`
+	err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("error in Insert Call ", err.Error())
+	}
+	return id, nil
 }
+
+// func (p *PostgreSQL) EndCall(peer1, peer2 string) error {
+// 	// var id string
+// 	// // // query := `UPDATE INTO call_sessions (peer1 , peer2) VALUES ($1,$2) RETURNING id;`
+// 	// // err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
+// 	// // if err != nil {
+// 	// // 	return fmt.Errorf("error in Insert Call ", err.Error())
+// 	// // }
+// 	// return nil
+// }

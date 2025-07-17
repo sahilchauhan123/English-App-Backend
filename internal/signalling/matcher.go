@@ -25,9 +25,22 @@ var availableClientsData = make(map[int64]types.User)  // Online ready for CALL
 var inCallClientsData = make(map[int64]types.User)     // Online Incall users
 var waitingForCallClients = make(map[int64]types.User) // Waiting For Joinin
 
-func handleClient(conn *websocket.Conn, storage *storage.Storage) {
+func handleClient(conn *websocket.Conn, db storage.Storage) {
 	var userID int64
-	var mutex *sync.Mutex
+	var mutex = &sync.Mutex{}
+
+	defer func(uid int64) {
+		delete(clients, uid)
+		delete(availableClientsData, uid)
+		delete(inCallClientsData, uid)
+		delete(waitingForCallClients, uid)
+
+		if err := conn.Close(); err != nil {
+			fmt.Println("connection close failed : ", err)
+			// Handle error (e.g., log it)s
+		}
+	}(userID)
+
 	for {
 		var msg Message
 		if err := conn.ReadJSON(&msg); err != nil {
@@ -35,22 +48,30 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 			break // Handle other errors (e.g., log them)
 		}
 
+		conn.WriteJSON(map[string]string{
+			"data": "connected to websocket",
+		})
+
 		switch msg.Type {
 		case "initialize":
 			userID = msg.User.Id
 			clients[userID] = conn
 			availableClientsData[userID] = msg.User
 
-			defer func(uid int64) {
-				delete(clients, uid)
-				delete(availableClientsData, uid)
-				if err := conn.Close(); err != nil {
-					fmt.Println("connection close failed : ", err)
-					// Handle error (e.g., log it)s
-				}
-			}(userID)
-			clients[userID].WriteMessage("connected succenssfuly")
-			continue
+			usersList, err := ShowRelatedUsersList()
+			if err != nil {
+				fmt.Println("err in show related user list ", err.Error())
+			}
+			err = conn.WriteJSON(map[string]any{
+				"type":         "initialized",
+				"user":         msg.User,
+				"online_users": usersList, // optional function
+				"message":      "connected successfully",
+			})
+			fmt.Println("running")
+			if err != nil {
+				fmt.Print("err in initializaion phase : ", err)
+			}
 
 		case "offer", "icecandidate":
 			targetConn, ok := clients[msg.Target]
@@ -80,9 +101,6 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 			inCallClientsData[msg.From] = availableClientsData[msg.From]
 			inCallClientsData[msg.Target] = availableClientsData[msg.Target]
 
-			delete(availableClientsData, msg.From)
-			delete(availableClientsData, msg.Target)
-
 			targetConn, ok := clients[msg.Target]
 			if !ok {
 				log.Printf("❌ Target user %d not connected", msg.Target)
@@ -102,12 +120,29 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 				},
 			})
 
+			delete(availableClientsData, msg.From)
+			delete(availableClientsData, msg.Target)
+			delete(waitingForCallClients, msg.From)
+			delete(waitingForCallClients, msg.Target)
+
 			// add Start call details to Database
 			go func() {
 				mutex.Lock()
-
-				mutex.Unlock()
+				defer mutex.Unlock()
+				callId, err := db.StartCall(msg.Target, msg.From)
+				if err != nil {
+					fmt.Println("error in start call ", err)
+				}
+				clients[msg.From].WriteJSON(map[string]string{
+					"type":   "callStarted",
+					"callId": callId,
+				})
+				clients[msg.Target].WriteJSON(map[string]string{
+					"type":   "callStarted",
+					"callId": callId,
+				})
 			}()
+
 			if err != nil {
 				log.Printf("🚨 Error writing to WebSocket: %v", err)
 			}
@@ -121,7 +156,7 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 
 			Target := clients[msg.Target]
 			Target.WriteJSON(Message{
-				Type:    "offer",
+				Type:    "endCall",
 				From:    msg.From,
 				Payload: msg.Payload,
 				FromUserData: map[string]any{
@@ -133,21 +168,23 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 					"age":         availableClientsData[msg.From].Age,
 				},
 			})
-			//Update in database Call Ending
-			go func() {
+			//Update in database Call Ended
+			// go func() {
 
-			}()
+			// }()
 
 		case "randomCall":
 			From := msg.From
 			waitingForCallClients[From] = availableClientsData[From]
 			peerID, err := findAUser(From)
 			if err != nil {
-				fmt.Errorf("Error in Random Call Func ", err.Error())
+				log.Println("Error in Random Call Func:", err.Error())
 				continue
 			}
+			// in fronted we will check if randomcallOffer received and user is in random match then  we will immediately send answer in response
+			// and other peer will receive answer and we will check if user is in random match then we will immeditely process to webrtc connection
 			clients[peerID].WriteJSON(Message{
-				Type:    "offer",
+				Type:    "randomCallOffer",
 				From:    msg.From,
 				Payload: msg.Payload,
 				FromUserData: map[string]any{
@@ -160,11 +197,18 @@ func handleClient(conn *websocket.Conn, storage *storage.Storage) {
 				},
 			})
 			delete(availableClientsData, From)
-
+		case "cancelRandomMatch":
+			availableClientsData[msg.From] = waitingForCallClients[msg.From]
+			delete(waitingForCallClients, msg.From)
+			clients[msg.From].WriteJSON(map[string]any{
+				"type": "canceledRandomMatch",
+			})
 		case "rejectCall":
+			delete(waitingForCallClients, msg.From)
+			delete(waitingForCallClients, msg.Target)
 			Target := msg.Target
 			clients[Target].WriteJSON(Message{
-				Type: "rejectCall",
+				Type: "rejectedCall",
 				From: msg.From,
 				FromUserData: map[string]any{
 					"id":          availableClientsData[msg.From].Id,
@@ -203,7 +247,7 @@ func ShowRelatedUsersList() ([]types.User, error) {
 		if len(msg) < 30 {
 			msg = append(msg, data)
 		} else {
-			break
+			return msg, nil
 		}
 
 	}
