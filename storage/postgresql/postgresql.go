@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,6 +28,8 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	createTableQuery := `
+	DROP TABLE IF EXISTS users;
+
 		CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
 			full_name TEXT NOT NULL,
@@ -37,7 +38,7 @@ func New() (*PostgreSQL, error) {
 			age TEXT NOT NULL,
 			gender TEXT NOT NULL,
 			interests TEXT[] NOT NULL,
-			created_at TIMESTAMPZ DEFAULT NOW(),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
 			profile_pic TEXT NOT NULL,
 			password TEXT NOT NULL,
 			auth_type TEXT NOT NULL
@@ -49,6 +50,8 @@ func New() (*PostgreSQL, error) {
 	}
 
 	createTableQuery = ` 
+	DROP TABLE IF EXISTS refresh_tokens;
+
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id INT PRIMARY KEY,
 		refresh_token TEXT NOT NULL
@@ -59,6 +62,7 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
 	createTableQuery = `
+	DROP TABLE IF EXISTS call_sessions;
 	CREATE TABLE IF NOT EXISTS call_sessions (
     	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
     	peer1_id BIGINT NOT NULL,
@@ -96,6 +100,8 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 			fmt.Println("User not found in database")
 			return false, user, nil // User not found
 		}
+		fmt.Println("im in errorrrrrrrr", err)
+		return false, user, nil
 	}
 
 	return true, user, nil
@@ -130,14 +136,14 @@ func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 	insertQuery := `INSERT INTO users (full_name, username, email, age,gender,interests, profile_pic,password, auth_type)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at;`
 	// var id int
-	var created_at pgtype.Timestamptz
+	// var created_at pgtype.Timestamptz
 
-	err = p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, hashedPassword, user.AuthType).Scan(&user.Id, &created_at)
+	err = p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, hashedPassword, user.AuthType).Scan(&user.Id, &user.CreatedAt)
 	if err != nil {
 		fmt.Println("Error inserting user:", err)
 		return fmt.Errorf("failed to insert user: %v", err)
 	}
-	user.CreatedAt = created_at.Time.String() // Convert pgtype.Timestamptz to string
+	// user.CreatedAt = created_at // Convert pgtype.Timestamptz to string
 	fmt.Println("User saved successfully with ID:", user.Id)
 
 	// Here you would typically execute an INSERT statement to save the user.

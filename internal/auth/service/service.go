@@ -157,6 +157,9 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 		AuthResponse.Message = "User not found in database, please register"
 		return AuthResponse, fmt.Errorf("user not found in database")
 	}
+	fmt.Println("testignGGGGGGG : ", user)
+	fmt.Println("testignGGG : ", user.AuthType)
+
 	//check AuthType
 	if user.AuthType != "email" {
 		AuthResponse.Message = "User is not registered with email authentication"

@@ -1,5 +1,9 @@
 package types
 
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
 // type GoogleUser struct {
 // 	FullName   string    `json:"full_name" binding:"required"`
 // 	Username   string    `json:"username" binding:"required"`
@@ -25,7 +29,9 @@ type User struct {
 	Interests  []string `json:"interests" binding:"required"`
 	ProfilePic string   `json:"profile_pic" binding:"required,url"`
 	AuthType   string   `json:"auth_type" binding:"required"` // "google" or "email"
-	CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
+	// CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
+	CreatedAt pgtype.Timestamptz `json:"created_at,omitempty"` // <-- CHANGE THIS LINE
+
 }
 
 type AuthResponse struct {
