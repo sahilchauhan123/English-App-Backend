@@ -208,3 +208,14 @@ func (p *PostgreSQL) StartCall(peer1, peer2 int64) (string, error) {
 // 	// // }
 // 	// return nil
 // }
+
+func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
+	var id int64
+	query := `SELECT * FROM refresh_tokens WHERE refresh_token == $1 RETURNING id;`
+	err := p.Db.QueryRow(context.Background(), query, token).Scan(&id)
+	if err == pgx.ErrNoRows {
+		fmt.Println("Token not found in database")
+		return false, 0
+	}
+	return true, id
+}

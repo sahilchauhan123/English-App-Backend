@@ -44,6 +44,10 @@ type EmailPassWordReset struct {
 	Otp   string `json:"otp" binding:"required"`
 }
 
+type Token struct {
+	RefreshToken string `json:"refreshToken" binding:"required"`
+}
+
 func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req GoogleLoginRequest
@@ -56,19 +60,49 @@ func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		}
 
 		// Handle Google login
-		data, err := authservice.HandleGoogleLogin(req.IDToken, db)
+		userData, err := authservice.HandleGoogleLogin(req.IDToken, db)
 		if err != nil {
 			fmt.Println("Error handling Google login:", err)
 			response.Failed(c, http.StatusInternalServerError, "Failed to login with Google")
 			return
 		}
 
-		if !data.IsRegistered {
+		if !userData.IsRegistered {
 			fmt.Println("User not found in database")
-			response.Success(c, data)
+			response.Success(c, userData)
 			return
 		}
-		response.Success(c, data)
+
+		// TOKENS CREATION
+		// ACCESS TOKEN
+		accessToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*3)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+		}
+		// STORE TO REDIS
+		err = redisClient.Client.Set(ctx, fmt.Sprintf("access_token:%d", userData.User.Id), accessToken, time.Hour*24*3).Err()
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+		}
+		fmt.Println(accessToken)
+
+		// REFRESH TOKEN
+		refreshToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*90)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+		}
+		// STORE TO POSTGRESQL
+		err = db.StoreToken(userData.User, refreshToken)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+		}
+		fmt.Println(refreshToken)
+
+		userData.AccessToken = accessToken
+		userData.RefreshToken = refreshToken
+		userData.User.Password = "" // Clear password for security
+
+		response.Success(c, userData)
 	}
 }
 
@@ -89,7 +123,7 @@ func GoogleCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClie
 
 		// TOKENS CREATION
 		// ACCESS TOKEN
-		accessToken, err := jwtMaker.CreateToken(userData.User.Id, userData.User.Email, time.Hour*24*3)
+		accessToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*3)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
 		}
@@ -101,7 +135,7 @@ func GoogleCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClie
 		fmt.Println(accessToken)
 
 		// REFRESH TOKEN
-		refreshToken, err := jwtMaker.CreateToken(userData.User.Id, userData.User.Email, time.Hour*24*90)
+		refreshToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*90)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
 		}
@@ -142,7 +176,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		}
 		// TOKENS CREATIONS
 		//ACCESS TOKEN
-		token, err := jwtMaker.CreateToken(user.Id, user.Email, time.Hour*24*3)
+		token, err := jwtMaker.CreateToken(user.Id, time.Hour*24*3)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, "Failed to create access token")
 			return
@@ -155,7 +189,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		}
 
 		//REFRESH TOKEN
-		refreshToken, err := jwtMaker.CreateToken(user.Id, user.Email, time.Hour*24*90)
+		refreshToken, err := jwtMaker.CreateToken(user.Id, time.Hour*24*90)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("Failed to create refresh token: %v", err).Error())
 			return
@@ -225,7 +259,7 @@ func EmailLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient
 
 		// TOKENS CREATIONS
 		//ACCESS TOKEN
-		token, err := jwtMaker.CreateToken(authResponse.User.Id, authResponse.User.Email, time.Hour*24*3)
+		token, err := jwtMaker.CreateToken(authResponse.User.Id, time.Hour*24*3)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, "Failed to create access token")
 			return
@@ -238,7 +272,7 @@ func EmailLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient
 		}
 
 		//REFRESH TOKEN
-		refreshToken, err := jwtMaker.CreateToken(authResponse.User.Id, authResponse.User.Email, time.Hour*24*90)
+		refreshToken, err := jwtMaker.CreateToken(authResponse.User.Id, time.Hour*24*90)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("Failed to create refresh token: %v", err).Error())
 			return
@@ -293,5 +327,37 @@ func ResetPasswordHandler(db storage.Storage, redis *redis.RedisClient) gin.Hand
 			return
 		}
 		response.Success(c, "Password Reset Successfull Please login now")
+	}
+}
+
+func UpdateTokenHandler(db storage.Storage, redis *redis.RedisClient, jwtMaker token.JWTMaker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var token Token
+		err := c.ShouldBindJSON(&token)
+		if err != nil {
+			fmt.Println("error in  UpdateTokenHandler : ", err)
+			response.Failed(c, http.StatusBadRequest, "invalid request")
+		}
+		id, err := authservice.HandleUpdateAccessToken(token.RefreshToken, db, *redis)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+		}
+
+		accessToken, err := jwtMaker.CreateToken(id, time.Hour*24*3)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, "Failed to create access token")
+			return
+		}
+		// STORE TO REDIS
+		err = redis.Client.Set(ctx, fmt.Sprintf("access_token:%d", id), accessToken, time.Hour*24*3).Err()
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("failed to store access token in redis: %v", err).Error())
+			return
+		}
+		response.Success(c, map[string]any{
+			"id":          id,
+			"accessToken": accessToken,
+		})
+		return
 	}
 }

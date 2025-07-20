@@ -21,11 +21,10 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (j *JWTMaker) CreateToken(userID int64, email string, duration time.Duration) (string, error) {
-	fmt.Println("Creating token for userID:", userID, "with email:", email, "and duration:", duration)
+func (j *JWTMaker) CreateToken(userID int64, duration time.Duration) (string, error) {
+	fmt.Println("Creating token for userID:", userID, "and duration:", duration)
 	claims := CustomClaims{
 		UserId: userID,
-		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -34,4 +33,25 @@ func (j *JWTMaker) CreateToken(userID int64, email string, duration time.Duratio
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	return token.SignedString([]byte(j.SecretKey))
+}
+
+func (j *JWTMaker) VerifyToken(tokenStr string) (*CustomClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
+		// Optional: make sure token uses HMAC SHA512
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(j.SecretKey), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*CustomClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	return claims, nil
 }

@@ -10,4 +10,5 @@ type Storage interface {
 	DeleteToken(userId int64) error
 	ChangePassword(email string, newPassword string) error
 	StartCall(peer1, peer2 int64) (string, error)
+	CheckToken(token string) (bool, int64)
 }

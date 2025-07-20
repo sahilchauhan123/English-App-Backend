@@ -39,13 +39,14 @@ func main() {
 	r := gin.Default()
 	authGroup := r.Group("/api/auth")
 	{
-		authGroup.POST("/logingoogle", authhandler.GoogleLoginHandler(storage, jwtMaker, redisClient))
-		authGroup.POST("/creategoogleuser", authhandler.GoogleCreateHandler(storage, jwtMaker, redisClient)) // Assuming this is the same handler for creating a user
-		authGroup.POST("/emaillogin", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
-		authGroup.POST("/createemailuser", authhandler.EmailCreateHandler(storage, jwtMaker, redisClient))
-		authGroup.GET("/checkuser", authhandler.CheckUsernameIsAvailable(storage, redisClient))
-		authGroup.POST("/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
-		authGroup.POST("/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
+		authGroup.POST("/google/login", authhandler.GoogleLoginHandler(storage, jwtMaker, redisClient))
+		authGroup.POST("/google/signup", authhandler.GoogleCreateHandler(storage, jwtMaker, redisClient)) // Assuming this is the same handler for creating a user
+		authGroup.POST("/email/login", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
+		authGroup.POST("/email/signup", authhandler.EmailCreateHandler(storage, jwtMaker, redisClient))
+		authGroup.GET("/checkusername", authhandler.CheckUsernameIsAvailable(storage, redisClient))
+		authGroup.POST("email/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
+		authGroup.POST("email/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
+		authGroup.POST("/refershToken", authhandler.UpdateTokenHandler(storage, redisClient, *jwtMaker))
 	}
 	r.GET("/ws", signalling.HandleWebSocket(storage))
 

@@ -268,3 +268,15 @@ func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
 }
+
+func HandleUpdateAccessToken(token string, db storage.Storage, redis redis.RedisClient) (int64, error) {
+	//check refresh token in sqldb
+	isPresent, id := db.CheckToken(token)
+	if !isPresent {
+		//Refresh Token expired
+		return 0, fmt.Errorf("Refresh Token expired")
+	}
+	//create t
+
+	return id, nil
+}
