@@ -61,8 +61,8 @@ func HandleGoogleLogin(IDToken string, db storage.Storage) (types.AuthResponse, 
 	// If user is not available, return isAvailable as false
 	if !isAvailable {
 		AuthResponse = types.AuthResponse{
-			IsRegistered: isAvailable,
-			User:         types.User{},
+			IsRegistered: false,
+			User:         user,
 			Message:      "User not found in database, please register",
 		}
 		return AuthResponse, nil
@@ -86,15 +86,19 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 
 	//check user should not already exist in the database
 	isAvailable, _, err := db.CheckUserInDatabase(payload.Claims["email"].(string))
+
 	if err != nil {
-		return AuthResponse, err
+		fmt.Println("runing errrror")
+		// return AuthResponse, err
 	}
+
 	if isAvailable {
+		fmt.Println("User already exists")
 		return types.AuthResponse{
 			IsRegistered: true,
 			User:         types.User{},
 			Message:      "User already exists, please login",
-		}, nil
+		}, fmt.Errorf("User already exists, please login")
 	}
 	user := types.User{
 		FullName:   payload.Claims["name"].(string),
@@ -108,12 +112,13 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 		AuthType: "google", // Assuming the auth type is google
 		Password: "",       // Password is not required for Google auth
 	}
+	fmt.Println("user data above : ", user)
 	// It should save the user information in the database.
 	err = db.SaveUserInDatabase(&user)
 	if err != nil {
 		return AuthResponse, err
 	}
-
+	fmt.Println("user data down : ", user)
 	AuthResponse = types.AuthResponse{
 		IsRegistered: true,
 		User:         user,

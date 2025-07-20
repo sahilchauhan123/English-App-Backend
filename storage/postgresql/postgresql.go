@@ -95,15 +95,16 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 	fmt.Println("Checking user in database:", email)
 	checkQuery := `SELECT id,full_name, username, email, age,gender,interests, profile_pic , created_at,password,auth_type FROM users WHERE email = $1;`
 	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(&user.Id, &user.FullName, &user.Username, &user.Email, &user.Age, &user.Gender, &user.Interests, &user.ProfilePic, &user.CreatedAt, &user.Password, &user.AuthType)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			fmt.Println("User not found in database")
-			return false, user, nil // User not found
-		}
-		fmt.Println("im in errorrrrrrrr", err)
-		return false, user, nil
-	}
 
+	if err == pgx.ErrNoRows {
+		fmt.Println("User not found in database")
+		return false, user, nil // User not found
+	}
+	// fmt.Println("im in errorrrrrrrr", err)
+	// return false, user, nil
+
+	//true means user is in database
+	//false mean user not found in database
 	return true, user, nil
 }
 
@@ -153,7 +154,13 @@ func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 }
 
 func (p *PostgreSQL) StoreToken(user types.User, token string) error {
-	query := `INSERT INTO refresh_tokens (id, refresh_token) VALUES ($1, $2);`
+	// query := `INSERT INTO refresh_tokens (id, refresh_token) VALUES ($1, $2);`
+	query := `
+		INSERT INTO refresh_tokens (id, refresh_token)
+		VALUES ($1, $2)
+		ON CONFLICT (id) DO UPDATE SET refresh_token = EXCLUDED.refresh_token;
+		`
+
 	_, err := p.Db.Exec(context.Background(), query, user.Id, token)
 	if err != nil {
 		fmt.Println("Error storing token:", err)

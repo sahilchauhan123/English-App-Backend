@@ -69,7 +69,10 @@ func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 
 		if !userData.IsRegistered {
 			fmt.Println("User not found in database")
-			response.Success(c, userData)
+			response.Success(c, map[string]any{
+				"isRegistered": false,
+				"message":      "Please Create Your Account First",
+			})
 			return
 		}
 
@@ -78,11 +81,13 @@ func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		accessToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*3)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		// STORE TO REDIS
 		err = redisClient.Client.Set(ctx, fmt.Sprintf("access_token:%d", userData.User.Id), accessToken, time.Hour*24*3).Err()
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		fmt.Println(accessToken)
 
@@ -90,11 +95,13 @@ func GoogleLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		refreshToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*90)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		// STORE TO POSTGRESQL
 		err = db.StoreToken(userData.User, refreshToken)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		fmt.Println(refreshToken)
 
@@ -112,13 +119,15 @@ func GoogleCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClie
 		var userData types.AuthResponse
 		err := c.ShouldBindJSON(&req)
 		if err != nil {
+			fmt.Println("failed in validation", err)
 			response.Failed(c, http.StatusBadRequest, "Invalid Request")
 			return
 		}
 		// Handle Google user creation
 		userData, err = authservice.HandleGoogleUserCreation(req, db)
 		if err != nil {
-			response.Failed(c, http.StatusInternalServerError, err.Error())
+			response.Failed(c, http.StatusInternalServerError, userData.Message)
+			return
 		}
 
 		// TOKENS CREATION
@@ -126,11 +135,13 @@ func GoogleCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClie
 		accessToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*3)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		// STORE TO REDIS
 		err = redisClient.Client.Set(ctx, fmt.Sprintf("access_token:%d", userData.User.Id), accessToken, time.Hour*24*3).Err()
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		fmt.Println(accessToken)
 
@@ -138,11 +149,13 @@ func GoogleCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClie
 		refreshToken, err := jwtMaker.CreateToken(userData.User.Id, time.Hour*24*90)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		// STORE TO POSTGRESQL
 		err = db.StoreToken(userData.User, refreshToken)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
 		}
 		fmt.Println(refreshToken)
 
