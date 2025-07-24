@@ -30,19 +30,22 @@ func New() (*PostgreSQL, error) {
 	createTableQuery := `
 	DROP TABLE IF EXISTS users;
 
-		CREATE TABLE IF NOT EXISTS users (
-			id SERIAL PRIMARY KEY,
-			full_name TEXT NOT NULL,
-			username TEXT NOT NULL,
-			email TEXT NOT NULL UNIQUE,
-			age TEXT NOT NULL,
-			gender TEXT NOT NULL,
-			interests TEXT[] NOT NULL,
-			created_at TIMESTAMPTZ DEFAULT NOW(),
-			profile_pic TEXT NOT NULL,
-			password TEXT NOT NULL,
-			auth_type TEXT NOT NULL
-		);`
+		CREATE TABLE users (
+		id SERIAL PRIMARY KEY,
+		full_name TEXT NOT NULL,
+		username TEXT NOT NULL,
+		email TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		age INT NOT NULL,
+		gender TEXT NOT NULL,
+		profile_pic TEXT NOT NULL,
+		auth_type TEXT NOT NULL,
+		main_challenge TEXT NOT NULL,
+		native_language TEXT NOT NULL,
+		current_english_level TEXT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+		);
+`
 
 	_, err = conn.Exec(context.Background(), createTableQuery)
 	if err != nil {
@@ -87,83 +90,95 @@ func New() (*PostgreSQL, error) {
 	return &PostgreSQL{Db: conn}, nil
 
 }
-
 func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error) {
-	// This function should check if the user exists in the database.
-	// If the user exists, return userDetailsWithJWTtoken, otherwise return false.
 	var user types.User
 	fmt.Println("Checking user in database:", email)
-	checkQuery := `SELECT id,full_name, username, email, age,gender,interests, profile_pic , created_at,password,auth_type FROM users WHERE email = $1;`
-	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(&user.Id, &user.FullName, &user.Username, &user.Email, &user.Age, &user.Gender, &user.Interests, &user.ProfilePic, &user.CreatedAt, &user.Password, &user.AuthType)
+
+	checkQuery := `SELECT 
+		id, full_name, username, email, age, gender, profile_pic, 
+		created_at, password, auth_type, main_challenge, native_language, current_english_level 
+		FROM users WHERE email = $1;`
+
+	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(
+		&user.Id,
+		&user.FullName,
+		&user.Username,
+		&user.Email,
+		&user.Age,
+		&user.Gender,
+		&user.ProfilePic,
+		&user.CreatedAt,
+		&user.Password,
+		&user.AuthType,
+		&user.MainChallenge,
+		&user.NativeLanguage,
+		&user.CurrentEnglishLevel,
+	)
 
 	if err == pgx.ErrNoRows {
 		fmt.Println("User not found in database")
-		return false, user, nil // User not found
+		return false, user, nil
+	} else if err != nil {
+		return false, user, fmt.Errorf("database error: %v", err)
 	}
-	// fmt.Println("im in errorrrrrrrr", err)
-	// return false, user, nil
 
-	//true means user is in database
-	//false mean user not found in database
 	return true, user, nil
 }
 
 func (p *PostgreSQL) CheckUsernameIsAvailable(username string) bool {
 	checkQuery := `SELECT email FROM users WHERE username = $1;`
 	var output string
-	p.Db.QueryRow(context.Background(), checkQuery, username).Scan(&output)
-
-	if output == "" {
-		fmt.Println("Username is available:", username)
-		return true // Username is available
+	err := p.Db.QueryRow(context.Background(), checkQuery, username).Scan(&output)
+	if err == pgx.ErrNoRows {
+		return true
 	}
-
 	return false
-
 }
 
 func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
-	// This function should save the user in the database.
-	// If the user is saved successfully, return nil, otherwise return an error.
-
 	fmt.Println("Saving user in database:", user)
 	hashedPassword, err := authservice.HashPassword(user.Password)
 	if err != nil {
-		fmt.Println("Error hashing password:", err)
 		return fmt.Errorf("failed to hash password: %v", err)
 	}
 	user.Password = hashedPassword
 
-	insertQuery := `INSERT INTO users (full_name, username, email, age,gender,interests, profile_pic,password, auth_type)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at;`
-	// var id int
-	// var created_at pgtype.Timestamptz
+	insertQuery := `INSERT INTO users (
+		full_name, username, email, age, gender, profile_pic, password,
+		auth_type, main_challenge, native_language, current_english_level
+	) VALUES (
+		$1, $2, $3, $4, $5, $6, $7,
+		$8, $9, $10, $11
+	) RETURNING id, created_at;`
 
-	err = p.Db.QueryRow(context.Background(), insertQuery, user.FullName, user.Username, user.Email, user.Age, user.Gender, user.Interests, user.ProfilePic, hashedPassword, user.AuthType).Scan(&user.Id, &user.CreatedAt)
+	err = p.Db.QueryRow(context.Background(), insertQuery,
+		user.FullName,
+		user.Username,
+		user.Email,
+		user.Age,
+		user.Gender,
+		user.ProfilePic,
+		user.Password,
+		user.AuthType,
+		user.MainChallenge,
+		user.NativeLanguage,
+		user.CurrentEnglishLevel,
+	).Scan(&user.Id, &user.CreatedAt)
+
 	if err != nil {
-		fmt.Println("Error inserting user:", err)
 		return fmt.Errorf("failed to insert user: %v", err)
 	}
-	// user.CreatedAt = created_at // Convert pgtype.Timestamptz to string
-	fmt.Println("User saved successfully with ID:", user.Id)
-
-	// Here you would typically execute an INSERT statement to save the user.
-	// For now, we will just return nil to indicate success.
-
 	return nil
 }
 
 func (p *PostgreSQL) StoreToken(user types.User, token string) error {
-	// query := `INSERT INTO refresh_tokens (id, refresh_token) VALUES ($1, $2);`
 	query := `
-		INSERT INTO refresh_tokens (id, refresh_token)
-		VALUES ($1, $2)
-		ON CONFLICT (id) DO UPDATE SET refresh_token = EXCLUDED.refresh_token;
-		`
+	INSERT INTO refresh_tokens (id, refresh_token)
+	VALUES ($1, $2)
+	ON CONFLICT (id) DO UPDATE SET refresh_token = EXCLUDED.refresh_token;`
 
 	_, err := p.Db.Exec(context.Background(), query, user.Id, token)
 	if err != nil {
-		fmt.Println("Error storing token:", err)
 		return fmt.Errorf("failed to store token: %v", err)
 	}
 	return nil
@@ -172,16 +187,13 @@ func (p *PostgreSQL) StoreToken(user types.User, token string) error {
 func (p *PostgreSQL) DeleteToken(userid int64) error {
 	query := `DELETE FROM refresh_tokens WHERE id = $1;`
 	_, err := p.Db.Exec(context.Background(), query, userid)
-	if err != nil {
-		// fmt.Println("Error deleting token:", err)
-		// return fmt.Errorf("failed to delete token: %v", err)
-		fmt.Println("token not found for user ID:", userid)
+	if err != nil && err != pgx.ErrNoRows {
+		return fmt.Errorf("failed to delete token: %v", err)
 	}
 	return nil
 }
 
 func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
-
 	password, err := authservice.HashPassword(newPassword)
 	if err != nil {
 		return err
@@ -189,39 +201,28 @@ func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
 	query := `UPDATE users SET password = $1 WHERE email = $2;`
 	_, err = p.Db.Exec(context.Background(), query, password, email)
 	if err != nil {
-		fmt.Println("Error changing password:", err)
 		return fmt.Errorf("failed to change password: %v", err)
 	}
-	fmt.Println("Password changed successfully for email:", email)
 	return nil
 }
 
 func (p *PostgreSQL) StartCall(peer1, peer2 int64) (string, error) {
 	var id string
-	query := `INSERT INTO call_sessions (peer1 , peer2) VALUES ($1,$2) RETURNING id;`
+	query := `INSERT INTO call_sessions (peer1, peer2) VALUES ($1, $2) RETURNING id;`
 	err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("error in Insert Call ", err.Error())
+		return "", fmt.Errorf("error starting call: %v", err)
 	}
 	return id, nil
 }
 
-// func (p *PostgreSQL) EndCall(peer1, peer2 string) error {
-// 	// var id string
-// 	// // // query := `UPDATE INTO call_sessions (peer1 , peer2) VALUES ($1,$2) RETURNING id;`
-// 	// // err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
-// 	// // if err != nil {
-// 	// // 	return fmt.Errorf("error in Insert Call ", err.Error())
-// 	// // }
-// 	// return nil
-// }
-
 func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
 	var id int64
-	query := `SELECT * FROM refresh_tokens WHERE refresh_token == $1 RETURNING id;`
+	query := `SELECT id FROM refresh_tokens WHERE refresh_token = $1;`
 	err := p.Db.QueryRow(context.Background(), query, token).Scan(&id)
 	if err == pgx.ErrNoRows {
-		fmt.Println("Token not found in database")
+		return false, 0
+	} else if err != nil {
 		return false, 0
 	}
 	return true, id

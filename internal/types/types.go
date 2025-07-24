@@ -19,20 +19,30 @@ import (
 // }
 
 type User struct {
-	Id         int64    `json:"id"` // Set by DB
-	FullName   string   `json:"full_name" binding:"required"`
-	Username   string   `json:"username" binding:"required"`
-	Email      string   `json:"email" binding:"required,email"`
-	Password   string   `json:"password,omitempty"` // Only used in local auth
-	Age        string   `json:"age" binding:"required"`
-	Gender     string   `json:"gender" binding:"required"`
-	Interests  []string `json:"interests" binding:"required"`
-	ProfilePic string   `json:"profile_pic" binding:"required,url"`
-	AuthType   string   `json:"auth_type" binding:"required"` // "google" or "email"
+	Id       int64  `json:"id"` // Set by DB
+	FullName string `json:"full_name" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password,omitempty"` // Only used in local auth
+	Age      int    `json:"age" binding:"required"`
+	Gender   string `json:"gender" binding:"required"`
+	// Interests      []string `json:"interests" binding:"required"`
+	ProfilePic          string `json:"profile_pic" binding:"required,url"`
+	AuthType            string `json:"auth_type" binding:"required"` // "google" or "email"
+	MainChallenge       string `json:"mainChallenge" binding:"required"`
+	NativeLanguage      string `json:"nativeLanguage" binding:"required"`
+	CurrentEnglishLevel string `json:"currentEnglishLevel" binding:"required"`
 	// CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
 	CreatedAt pgtype.Timestamptz `json:"created_at,omitempty"` // <-- CHANGE THIS LINE
 
 }
+
+// gender: '',   				DONE
+// nativeLanguage:'',			DONE
+// currentEnglishLevel:'',  	DONE
+// age:'',						DONE
+// mainChallenge:'',			DONE
+// username:''					DONE
 
 type AuthResponse struct {
 	IsRegistered bool   `json:"isRegistered"`
@@ -43,10 +53,11 @@ type AuthResponse struct {
 }
 
 type GoogleAccountCreate struct {
-	IDToken        string   `json:"id_token" binding:"required"`
-	Username       string   `json:"username" binding:"required"`
-	Interests      []string `json:"interests" binding:"required"`
-	Gender         string   `json:"gender" binding:"required"`
-	Age            string   `json:"age" binding:"required"`
-	NativeLanguage string   `json:"native_language" binding:"required"`
+	IDToken             string `json:"id_token" binding:"required"`
+	Username            string `json:"username" binding:"required"`
+	Gender              string `json:"gender" binding:"required"`
+	Age                 int    `json:"age" binding:"required"`
+	NativeLanguage      string `json:"nativeLanguage" binding:"required"`
+	CurrentEnglishLevel string `json:"currentEnglishLevel" binding:"required"`
+	MainChallenge       string `json:"mainChallenge" binding:"required"`
 }

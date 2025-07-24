@@ -101,13 +101,15 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 		}, fmt.Errorf("User already exists, please login")
 	}
 	user := types.User{
-		FullName:   payload.Claims["name"].(string),
-		Username:   body.Username,
-		Gender:     body.Gender,
-		ProfilePic: payload.Claims["picture"].(string),
-		Email:      payload.Claims["email"].(string),
-		Interests:  body.Interests,
-		Age:        body.Age,
+		FullName:            payload.Claims["name"].(string),
+		Username:            body.Username,
+		Gender:              body.Gender,
+		ProfilePic:          payload.Claims["picture"].(string),
+		Email:               payload.Claims["email"].(string),
+		Age:                 body.Age,
+		MainChallenge:       body.MainChallenge,
+		CurrentEnglishLevel: body.CurrentEnglishLevel,
+		NativeLanguage:      body.NativeLanguage,
 		// CreatedAt:  time.Now(),
 		AuthType: "google", // Assuming the auth type is google
 		Password: "",       // Password is not required for Google auth
