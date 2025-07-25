@@ -200,6 +200,34 @@ func matchHashedPasswords(hashedPassWord, password string) bool {
 
 	return true
 }
+
+func HandleEmailLoginOTPGenerate(db storage.Storage, email string, redis redis.RedisClient) (bool, error) {
+	exist, _, err := db.CheckUserInDatabase(email)
+
+	if err != nil {
+		return false, err
+	}
+	if !exist {
+		return false, nil
+	}
+	otp := generateRandomNumber()
+	key := fmt.Sprintf("otp_login:%s", email)
+
+	// storing in redis
+	redis.Client.Set(context.Background(), key, map[string]any{
+		"email": email,
+		"opt":   otp,
+	}, time.Minute*5)
+
+	//send otp to user email
+	err = smtp.SendEmailOTP(email, otp)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+
+}
 func HandlePasswordForget(email string, password string, db storage.Storage, redis *redis.RedisClient) error {
 	// check user exists or not
 	// if exists then check auth type should be email

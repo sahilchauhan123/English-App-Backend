@@ -28,6 +28,10 @@ type EmailLoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type EmailOtpLogin struct {
+	Email string `json:"email" binding:"required"`
+}
+
 type Res struct {
 	IsRegistered bool   `json:"is_registered"`
 	Message      string `json:"message"`
@@ -221,6 +225,36 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 
 		response.Success(c, authResponse)
 		// return
+	}
+}
+
+func GenerateEmailLoginOtp(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var email EmailOtpLogin
+
+		err := c.ShouldBindJSON(&email)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Requestsss")
+			return
+		}
+
+		userExist, err := authservice.HandleEmailLoginOTPGenerate(db, email.Email, *redisClient)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "failed in 2nd phase")
+			return
+		}
+		if !userExist {
+			response.Success(c, map[string]any{
+				"optSent": false,
+				"message": "Please Create Account First. User does not exist in database.",
+			})
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"optSent": true,
+			"message": "otp successfully sent",
+		})
 	}
 }
 
