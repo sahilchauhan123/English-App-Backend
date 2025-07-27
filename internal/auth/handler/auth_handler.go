@@ -24,8 +24,8 @@ type GoogleLoginRequest struct {
 }
 
 type EmailLoginRequest struct {
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Email string `json:"email" binding:"required"`
+	Otp   string `json:"otp" binding:"required"`
 }
 
 type EmailOtpLogin struct {
@@ -176,19 +176,17 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 
 		var user types.User
 		var authResponse types.AuthResponse
+
 		err := c.ShouldBindJSON(&user)
 		if err != nil {
 			response.Failed(c, http.StatusBadRequest, "Invalid Request")
 			return
 		}
-		if user.AuthType != "email" {
-			response.Failed(c, http.StatusBadRequest, "Invalid Auth Type")
-			return
-		}
+		user.AuthType = "email" // prevent any hacks
 
-		authResponse, err = authservice.HandleEmailUserCreation(&user, db)
+		authResponse, err = authservice.HandleEmailUserCreation(&user, db, redisClient)
 		if err != nil {
-			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("user creation failed %v", err).Error())
+			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("user creation failed due to :  %v", err).Error())
 			return
 		}
 		// TOKENS CREATIONS
@@ -234,13 +232,13 @@ func GenerateEmailLoginOtp(db storage.Storage, jwtMaker *token.JWTMaker, redisCl
 
 		err := c.ShouldBindJSON(&email)
 		if err != nil {
-			response.Failed(c, http.StatusBadRequest, "Invalid Requestsss")
+			response.Failed(c, http.StatusBadRequest, "Invalid Requests")
 			return
 		}
 
 		userExist, err := authservice.HandleEmailLoginOTPGenerate(db, email.Email, *redisClient)
 		if err != nil {
-			response.Failed(c, http.StatusBadRequest, "failed in 2nd phase")
+			response.Failed(c, http.StatusBadRequest, err.Error())
 			return
 		}
 		if !userExist {
@@ -255,6 +253,38 @@ func GenerateEmailLoginOtp(db storage.Storage, jwtMaker *token.JWTMaker, redisCl
 			"optSent": true,
 			"message": "otp successfully sent",
 		})
+	}
+}
+
+func GenerateEmailSignUpOtp(db storage.Storage, jwtMaker *token.JWTMaker, redisClient *redis.RedisClient) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// validate body
+		var email EmailOtpLogin
+		err := c.ShouldBindJSON(&email)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+
+		userExists, err := authservice.HandleEmailSignUpOtp(email.Email, db, redisClient)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, "Invalid Request")
+			return
+		}
+		// check user exist or not if not exits then only move forward
+		if userExists {
+			response.Success(c, map[string]any{
+				"userExist": true,
+				"message":   "User Already exist please login",
+			})
+			return
+		}
+		response.Success(c, map[string]any{
+			"userExist": false,
+			"message":   "otp send successfully",
+		})
+		// after this user will send its data along with otp that he received to this api email/signup
 	}
 }
 
@@ -298,7 +328,7 @@ func EmailLoginHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClient
 		}
 
 		// Handle Email login
-		authResponse, err := authservice.HandleEmailLogin(req.Email, req.Password, db, redisClient)
+		authResponse, err := authservice.HandleEmailLogin(req.Email, req.Otp, db, redisClient)
 		if err != nil {
 			response.Failed(c, http.StatusBadRequest, fmt.Errorf("error handling email login: %v", err).Error())
 			return

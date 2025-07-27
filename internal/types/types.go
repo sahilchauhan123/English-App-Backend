@@ -34,7 +34,7 @@ type User struct {
 	CurrentEnglishLevel string `json:"currentEnglishLevel" binding:"required"`
 	// CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
 	CreatedAt pgtype.Timestamptz `json:"created_at,omitempty"` // <-- CHANGE THIS LINE
-
+	Otp       string             `json:"opt,omitempty"`
 }
 
 // gender: '',   				DONE

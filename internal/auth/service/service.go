@@ -22,6 +22,10 @@ type EmailPassWordReset struct {
 	Password string `json:"password" binding:"required"`
 	OTP      string `json:"otp" binding:"required"`
 }
+type OtpRedisResponse struct {
+	Email string `json:"email" binding:"required"`
+	OTP   string `json:"otp" binding:"required"`
+}
 
 func generateRandomNumber() string {
 	// Generate a random number between 1000 and 9999 (inclusive)
@@ -129,8 +133,10 @@ func HandleGoogleUserCreation(body types.GoogleAccountCreate, db storage.Storage
 	return AuthResponse, nil
 }
 
-func HandleEmailUserCreation(user *types.User, db storage.Storage) (types.AuthResponse, error) {
+func HandleEmailUserCreation(user *types.User, db storage.Storage, redis *redis.RedisClient) (types.AuthResponse, error) {
 	var AuthResponse types.AuthResponse
+	var OtpRedis OtpRedisResponse
+
 	//check already in db
 	isUserNameAvaibale := db.CheckUsernameIsAvailable(user.Username)
 	if !isUserNameAvaibale {
@@ -141,21 +147,59 @@ func HandleEmailUserCreation(user *types.User, db storage.Storage) (types.AuthRe
 	if isAlreadyAvailable {
 		return AuthResponse, fmt.Errorf("user already exists")
 	}
-	//store in db
 
-	err := db.SaveUserInDatabase(user)
+	// check otp is matching or not
+	key := fmt.Sprintf("otp_signup:%s", user.Email)
+	data, err := redis.Client.Get(context.Background(), key).Result()
+	if err != nil {
+		return AuthResponse, err
+	}
+	err = json.Unmarshal([]byte(data), &OtpRedis)
+	if err != nil {
+		AuthResponse.Message = "error unmarshalling OTP data"
+		return AuthResponse, fmt.Errorf("error unmarshalling OTP data: %v", err)
+	}
+
+	if user.Otp != OtpRedis.OTP {
+		AuthResponse.Message = "otp is invalid"
+		return AuthResponse, fmt.Errorf("otp is invalid")
+	}
+	//store in db
+	err = db.SaveUserInDatabase(user)
 	if err != nil {
 		return AuthResponse, fmt.Errorf("error saving user in database")
 	}
 	return AuthResponse, nil
 }
 
-func HandleEmailLogin(email string, password string, db storage.Storage, redisclient *redis.RedisClient) (types.AuthResponse, error) {
+func HandleEmailSignUpOtp(email string, db storage.Storage, redisclient *redis.RedisClient) (bool, error) {
+
+	exists, _, err := db.CheckUserInDatabase(email)
+	if err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+
+	key := fmt.Sprintf("otp_signup:%s", email)
+	otp := generateRandomNumber()
+	redisclient.Client.Set(context.Background(), key, map[string]any{
+		"email": email,
+		"otp":   otp,
+	}, time.Minute*5)
+
+	return false, nil
+}
+
+func HandleEmailLogin(email string, otp string, db storage.Storage, redisclient *redis.RedisClient) (types.AuthResponse, error) {
 
 	var AuthResponse types.AuthResponse
+	var OtpRedis OtpRedisResponse
 	//check user in db
 	isAvailable, user, err := db.CheckUserInDatabase(email)
 	fmt.Println("userdata : ", user)
+
 	if err != nil {
 		AuthResponse.Message = "Error checking user in database"
 		return AuthResponse, fmt.Errorf("error checking user in database: %v", err)
@@ -164,20 +208,31 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 		AuthResponse.Message = "User not found in database, please register"
 		return AuthResponse, fmt.Errorf("user not found in database")
 	}
-	fmt.Println("testignGGGGGGG : ", user)
-	fmt.Println("testignGGG : ", user.AuthType)
-
 	//check AuthType
 	if user.AuthType != "email" {
 		AuthResponse.Message = "User is not registered with email authentication"
 		return AuthResponse, fmt.Errorf("user is not registered with email authentication")
 	}
 
-	matched := matchHashedPasswords(user.Password, password)
-	if !matched {
-		AuthResponse.Message = "Invalid password"
-		return AuthResponse, fmt.Errorf("invalid password")
+	// fetch otp from redis if not found
+	key := fmt.Sprintf("otp_login:%s", email)
+
+	data, err := redisclient.Client.Get(context.Background(), key).Result()
+	if err != nil {
+		return AuthResponse, err
 	}
+
+	err = json.Unmarshal([]byte(data), &OtpRedis)
+	if err != nil {
+		AuthResponse.Message = "error unmarshalling OTP data"
+		return AuthResponse, fmt.Errorf("error unmarshalling OTP data: %v", err)
+	}
+
+	if OtpRedis.OTP != otp {
+		AuthResponse.Message = "Invalid Otp"
+		return AuthResponse, fmt.Errorf("invalid Otp")
+	}
+
 	// delete the Refresh token
 	_ = db.DeleteToken(user.Id)
 	// delete the Access token
@@ -192,14 +247,14 @@ func HandleEmailLogin(email string, password string, db storage.Storage, rediscl
 
 }
 
-func matchHashedPasswords(hashedPassWord, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassWord), []byte(password))
-	if err != nil {
-		return false // Passwords do not match
-	}
+// func matchHashedPasswords(hashedPassWord, password string) bool {
+// 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassWord), []byte(password))
+// 	if err != nil {
+// 		return false // Passwords do not match
+// 	}
 
-	return true
-}
+// 	return true
+// }
 
 func HandleEmailLoginOTPGenerate(db storage.Storage, email string, redis redis.RedisClient) (bool, error) {
 	exist, _, err := db.CheckUserInDatabase(email)
