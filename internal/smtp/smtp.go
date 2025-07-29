@@ -33,6 +33,7 @@
 package smtp
 
 import (
+	"fmt"
 	"net/smtp"
 	"os"
 )
@@ -92,5 +93,6 @@ func SendEmailOTP(to, otp string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Email sent successfully to", to)
 	return nil
 }

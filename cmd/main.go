@@ -44,10 +44,10 @@ func main() {
 		authGroup.POST("/email/login", authhandler.EmailLoginHandler(storage, jwtMaker, redisClient))
 		authGroup.POST("/email/signup", authhandler.EmailCreateHandler(storage, jwtMaker, redisClient))
 		authGroup.POST("/email/generateloginotp", authhandler.GenerateEmailLoginOtp(storage, jwtMaker, redisClient))
-		authGroup.POST("/email/generateloginotp", authhandler.GenerateEmailSignUpOtp(storage, jwtMaker, redisClient))
+		authGroup.POST("/email/generatesignupotp", authhandler.GenerateEmailSignUpOtp(storage, jwtMaker, redisClient))
 		authGroup.GET("/checkusername", authhandler.CheckUsernameIsAvailable(storage, redisClient))
-		authGroup.POST("/email/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
-		authGroup.POST("/email/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
+		// authGroup.POST("/email/forgetPassword", authhandler.ForgetPasswordHandler(storage, redisClient))
+		// authGroup.POST("/email/resetPassword", authhandler.ResetPasswordHandler(storage, redisClient))
 		authGroup.POST("/refershToken", authhandler.UpdateTokenHandler(storage, redisClient, *jwtMaker))
 	}
 	r.GET("/ws", signalling.HandleWebSocket(storage))

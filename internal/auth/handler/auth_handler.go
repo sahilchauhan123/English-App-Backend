@@ -220,7 +220,7 @@ func EmailCreateHandler(db storage.Storage, jwtMaker *token.JWTMaker, redisClien
 		authResponse.AccessToken = token
 		authResponse.RefreshToken = refreshToken
 		authResponse.Message = "User created successfully"
-
+		authResponse.User.Otp = "" // Clear OTP for security
 		response.Success(c, authResponse)
 		// return
 	}
@@ -435,6 +435,5 @@ func UpdateTokenHandler(db storage.Storage, redis *redis.RedisClient, jwtMaker t
 			"id":          id,
 			"accessToken": accessToken,
 		})
-		return
 	}
 }

@@ -51,6 +51,7 @@ func HandleGoogleLogin(IDToken string, db storage.Storage) (types.AuthResponse, 
 	if err != nil {
 		return AuthResponse, nil
 	}
+
 	email, ok := payload.Claims["email"].(string)
 	if !ok {
 		return AuthResponse, nil
@@ -152,6 +153,7 @@ func HandleEmailUserCreation(user *types.User, db storage.Storage, redis *redis.
 	key := fmt.Sprintf("otp_signup:%s", user.Email)
 	data, err := redis.Client.Get(context.Background(), key).Result()
 	if err != nil {
+		fmt.Println("Error fetching OTP from Redis:", err)
 		return AuthResponse, err
 	}
 	err = json.Unmarshal([]byte(data), &OtpRedis)
@@ -159,7 +161,7 @@ func HandleEmailUserCreation(user *types.User, db storage.Storage, redis *redis.
 		AuthResponse.Message = "error unmarshalling OTP data"
 		return AuthResponse, fmt.Errorf("error unmarshalling OTP data: %v", err)
 	}
-
+	fmt.Println("OtpRedis data : ", OtpRedis, "user otp : ", user.Otp)
 	if user.Otp != OtpRedis.OTP {
 		AuthResponse.Message = "otp is invalid"
 		return AuthResponse, fmt.Errorf("otp is invalid")
@@ -176,19 +178,34 @@ func HandleEmailSignUpOtp(email string, db storage.Storage, redisclient *redis.R
 
 	exists, _, err := db.CheckUserInDatabase(email)
 	if err != nil {
+		fmt.Println("Error checking user in database:", err)
 		return false, err
 	}
-	if !exists {
+	if exists {
 		return false, nil
 	}
 
 	key := fmt.Sprintf("otp_signup:%s", email)
 	otp := generateRandomNumber()
-	redisclient.Client.Set(context.Background(), key, map[string]any{
+	value := map[string]any{
 		"email": email,
 		"otp":   otp,
-	}, time.Minute*5)
+	}
+	valueJSON, err := json.Marshal(value)
+	if err != nil {
+		fmt.Println("Error marshalling OTP data:", err)
+		return false, err
+	}
+	_, err = redisclient.Client.Set(context.Background(), key, valueJSON, time.Minute*5).Result()
 
+	if err != nil {
+		fmt.Println("Error setting OTP in Redis:", err)
+		return false, err
+	}
+	err = smtp.SendEmailOTP(email, otp)
+	if err != nil {
+		return false, err
+	}
 	return false, nil
 }
 
@@ -257,7 +274,7 @@ func HandleEmailLogin(email string, otp string, db storage.Storage, redisclient 
 // }
 
 func HandleEmailLoginOTPGenerate(db storage.Storage, email string, redis redis.RedisClient) (bool, error) {
-	exist, _, err := db.CheckUserInDatabase(email)
+	exist, userData, err := db.CheckUserInDatabase(email)
 
 	if err != nil {
 		return false, err
@@ -265,6 +282,10 @@ func HandleEmailLoginOTPGenerate(db storage.Storage, email string, redis redis.R
 	if !exist {
 		return false, nil
 	}
+	if userData.AuthType == "google" {
+		return false, fmt.Errorf("Please Login via Google.")
+	}
+
 	otp := generateRandomNumber()
 	key := fmt.Sprintf("otp_login:%s", email)
 
