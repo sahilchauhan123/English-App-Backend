@@ -56,5 +56,6 @@ func main() {
 	if port == "" {
 		port = "8080" // fallback for local dev
 	}
+
 	r.Run(":" + port) // Gin binds to specified port
 }

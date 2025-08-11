@@ -58,11 +58,14 @@ func HandleGoogleLogin(IDToken string, db storage.Storage) (types.AuthResponse, 
 	}
 	// Check user in Database
 	isAvailable, user, err := db.CheckUserInDatabase(email)
+
 	if err != nil {
 		return AuthResponse, nil
 	}
 	fmt.Println("user available in database:", isAvailable, "user:", user)
-
+	// if user.AuthType != "google" {
+	// 	return AuthResponse, fmt.Errorf("user is not registered with google authentication")
+	// }
 	// If user is not available, return isAvailable as false
 	if !isAvailable {
 		AuthResponse = types.AuthResponse{
@@ -290,11 +293,20 @@ func HandleEmailLoginOTPGenerate(db storage.Storage, email string, redis redis.R
 	key := fmt.Sprintf("otp_login:%s", email)
 
 	// storing in redis
-	redis.Client.Set(context.Background(), key, map[string]any{
+	value := map[string]any{
 		"email": email,
-		"opt":   otp,
-	}, time.Minute*5)
-
+		"otp":   otp,
+	}
+	valueJSON, err := json.Marshal(value)
+	if err != nil {
+		fmt.Println("Error Marshal : ", err)
+		return false, err
+	}
+	_, err = redis.Client.Set(context.Background(), key, valueJSON, time.Minute*5).Result()
+	if err != nil {
+		fmt.Println("Error setting OTP in Redis:", err)
+		return false, err
+	}
 	//send otp to user email
 	err = smtp.SendEmailOTP(email, otp)
 	if err != nil {
