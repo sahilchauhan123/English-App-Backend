@@ -28,9 +28,8 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	createTableQuery := `
-	DROP TABLE IF EXISTS users;
 
-		CREATE TABLE users (
+		CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
 		full_name TEXT NOT NULL,
 		username TEXT NOT NULL,
@@ -53,7 +52,6 @@ func New() (*PostgreSQL, error) {
 	}
 
 	createTableQuery = ` 
-	DROP TABLE IF EXISTS refresh_tokens;
 
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id INT PRIMARY KEY,
@@ -65,7 +63,6 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
 	createTableQuery = `
-	DROP TABLE IF EXISTS call_sessions;
 	CREATE TABLE IF NOT EXISTS call_sessions (
     	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
     	peer1_id BIGINT NOT NULL,
