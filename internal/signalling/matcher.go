@@ -464,6 +464,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 				"target":         peerID,
 				"targetUserData": allClientsData[peerID],
 			}
+			fmt.Printf("%s got connected to %s", allClientsData[From].FullName, allClientsData[peerID].FullName)
 
 		case "endCall":
 			mutex.Lock()
@@ -510,13 +511,15 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 func findAUser(id int64) (int64, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	for peer := range waitingForCallClients {
-		if id != peer {
-			inCallClientsData[peer] = allClientsData[peer]
-			inCallClientsData[id] = allClientsData[id]
-			delete(waitingForCallClients, id)
-			delete(waitingForCallClients, peer)
-			return peer, nil
+	if len(waitingForCallClients) > 0 {
+		for peer := range waitingForCallClients {
+			if id != peer {
+				inCallClientsData[peer] = allClientsData[peer]
+				inCallClientsData[id] = allClientsData[id]
+				delete(waitingForCallClients, id)
+				delete(waitingForCallClients, peer)
+				return peer, nil
+			}
 		}
 	}
 	waitingForCallClients[id] = availableClientsData[id]
@@ -531,6 +534,7 @@ func findAUser(id int64) (int64, error) {
 	}(id)
 
 	return 0, errors.New("did not find any user")
+
 }
 
 func ShowRelatedUsersList(id int64) ([]types.User, error) {
