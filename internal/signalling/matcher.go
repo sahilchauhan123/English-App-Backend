@@ -578,6 +578,7 @@ type Message struct {
 	From         int64      `json:"from,omitempty"`
 	FromUserData any        `json:"fromUserData,omitempty"`
 	RandomCall   bool       `json:"randomCall,omitempty"`
+	CallId       string     `json:"callId,omitempty"`
 }
 
 // Client wraps a websocket connection with a send channel
@@ -723,6 +724,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 			delete(waitingForCallClients, msg.From)
 			delete(waitingForCallClients, msg.Target)
 			target := clients[msg.Target]
+			from := clients[msg.From]
 			mutex.Unlock()
 
 			target.Send <- Message{
@@ -739,6 +741,23 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 				},
 				Target: msg.Target,
 			}
+			// add Start call details to Database
+			go func() {
+				mutex.Lock()
+				defer mutex.Unlock()
+				callId, err := db.StartCall(msg.Target, msg.From)
+				if err != nil {
+					fmt.Println("error in start call ", err)
+				}
+				from.Send <- map[string]string{
+					"type":   "callStarted",
+					"callId": callId,
+				}
+				target.Send <- map[string]string{
+					"type":   "callStarted",
+					"callId": callId,
+				}
+			}()
 
 		case "randomCall":
 			From := msg.From
@@ -785,6 +804,13 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 				Payload:      msg.Payload,
 				FromUserData: allClientsData[msg.From],
 			}
+			//Update in database Call Ended
+			go func(uid string) {
+				err := db.EndCall(uid)
+				if err != nil {
+					fmt.Println("error in end call ", err)
+				}
+			}(msg.CallId)
 
 		case "cancelRandomMatch":
 			mutex.Lock()

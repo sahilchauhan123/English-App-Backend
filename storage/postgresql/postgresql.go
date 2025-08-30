@@ -224,3 +224,12 @@ func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
 	}
 	return true, id
 }
+
+func (p *PostgreSQL) EndCall(id string) error {
+	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing;`
+	_, err := p.Db.Exec(context.Background(), query, id)
+	if err != nil {
+		return fmt.Errorf("error ending call: %v", err)
+	}
+	return nil
+}
