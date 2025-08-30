@@ -25,6 +25,8 @@ func main() {
 		fmt.Println("Error creating JWT maker")
 		return
 	}
+	// check user every 15 sec
+	signalling.StartUserChecker()
 
 	storage, err := postgresql.New()
 	if err != nil {
