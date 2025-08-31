@@ -417,7 +417,7 @@ func UpdateTokenHandler(db storage.Storage, redis *redis.RedisClient, jwtMaker t
 		}
 		id, err := authservice.HandleUpdateAccessToken(token.RefreshToken, db, *redis)
 		if err != nil {
-			response.Failed(c, http.StatusBadRequest, err.Error())
+			response.Failed(c, http.StatusUnauthorized, err.Error())
 		}
 
 		accessToken, err := jwtMaker.CreateToken(id, time.Hour*24*3)

@@ -38,9 +38,13 @@ func (j *JWTMaker) CreateToken(userID int64, duration time.Duration) (string, er
 func (j *JWTMaker) VerifyToken(tokenStr string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		// Optional: make sure token uses HMAC SHA512
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		// if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		// 	return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		// }
+		if t.Method != jwt.SigningMethodHS512 {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
+
 		return []byte(j.SecretKey), nil
 	})
 

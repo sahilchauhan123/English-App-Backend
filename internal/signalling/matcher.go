@@ -915,6 +915,9 @@ func StartUserChecker() {
 	go func() {
 		for {
 			time.Sleep(15 * time.Second)
+			if len(clients) <= 0 {
+				continue
+			}
 			for id, client := range clients {
 				if time.Since(client.LastActive) > 15*time.Second {
 					go func(uid int64, c *Client) {
