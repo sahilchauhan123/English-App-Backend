@@ -28,6 +28,7 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	createTableQuery := `
+		DROP TABLE IF EXISTS users;
 
 		CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
@@ -42,7 +43,8 @@ func New() (*PostgreSQL, error) {
 		main_challenge TEXT NOT NULL,
 		native_language TEXT NOT NULL,
 		current_english_level TEXT NOT NULL,
-		created_at TIMESTAMPTZ DEFAULT NOW()
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		pictures TEXT[]
 		);
 `
 
@@ -52,7 +54,7 @@ func New() (*PostgreSQL, error) {
 	}
 
 	createTableQuery = ` 
-
+	DROP TABLE IF EXISTS refresh_tokens;
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id INT PRIMARY KEY,
 		refresh_token TEXT NOT NULL
@@ -63,6 +65,7 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
 	createTableQuery = `
+	DROP TABLE IF EXISTS call_sessions;
 	CREATE TABLE IF NOT EXISTS call_sessions (
     	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
     	peer1_id BIGINT NOT NULL,
@@ -225,11 +228,33 @@ func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
 	return true, id
 }
 
-func (p *PostgreSQL) EndCall(id string) error {
+func (p *PostgreSQL) EndCall(id int64) error {
 	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing;`
 	_, err := p.Db.Exec(context.Background(), query, id)
 	if err != nil {
 		return fmt.Errorf("error ending call: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgreSQL) InsertPicture(id int64, imageUrl string) error {
+
+	// check length first should be < 5  in postgresql
+	var pictures []string
+	checkQuery := `SELECT pictures FROM users WHERE id = $1;`
+	err := p.Db.QueryRow(context.Background(), checkQuery, id).Scan(&pictures)
+	if err != nil {
+		return fmt.Errorf("error checking pictures: %v", err)
+	}
+	if len(pictures) > 5 {
+		return fmt.Errorf("cannot upload more than 5 pictures")
+	}
+
+	// insert picture
+	query := `UPDATE users SET pictures = array_append(pictures, $1) WHERE id = $2;`
+	_, err = p.Db.Exec(context.Background(), query, imageUrl, id)
+	if err != nil {
+		return fmt.Errorf("error inserting picture: %v", err)
 	}
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github/english-app/internal/auth/middleware"
 	"github/english-app/internal/auth/token"
 	"github/english-app/internal/signalling"
+	userhandler "github/english-app/internal/user/handler"
 	"github/english-app/storage/postgresql"
 	"github/english-app/storage/redis"
 	"github/english-app/storage/s3"
@@ -17,27 +18,35 @@ import (
 
 func main() {
 	fmt.Println("server running...")
+
+	// ENV LOADING
 	_ = godotenv.Load()
 
+	// JWT MAKER
 	jwtMaker := token.NewJWTMaker(os.Getenv("JWTTOKEN_SECRET"))
 	if jwtMaker == nil {
 		fmt.Println("Error creating JWT maker")
 		return
 	}
-	_ = s3.NewS3Client(os.Getenv("R2_ACCOUNT_ID"), os.Getenv("R2_BUCKET_ACCESS_KEY"), os.Getenv("R2_BUCKET_SECRET_ACCESS_KEY"), os.Getenv("R2_REGION"))
-	// url, err := s3Client.PutObject(os.Getenv("R2_BUCKET_NAME"), "testing", 1000)
-	// if err != nil {
-	// 	fmt.Println("err in s3", err)
-	// }
-	// fmt.Println("url", url)
-	// check user every 15 sec
+
+	// CHECK WEBSOCKET USER CONNECTION / PRESENCE
 	signalling.StartUserChecker()
 
+	// S3 OBJECT STORAGE
+	R2_ACCOUNT_ID := os.Getenv("R2_ACCOUNT_ID")
+	R2_BUCKET_ACCESS_KEY := os.Getenv("R2_BUCKET_ACCESS_KEY")
+	R2_BUCKET_SECRET_ACCESS_KEY := os.Getenv("R2_BUCKET_SECRET_ACCESS_KEY")
+	R2_REGION := os.Getenv("R2_REGION")
+	s3Client := s3.NewS3Client(R2_ACCOUNT_ID, R2_BUCKET_ACCESS_KEY, R2_BUCKET_SECRET_ACCESS_KEY, R2_REGION)
+
+	// SQL INSTANCE
 	storage, err := postgresql.New()
 	if err != nil {
 		fmt.Println("Error connecting to database:", err)
 		return
 	}
+
+	// REDIS INSTANCE
 	redisClient, err := redis.New()
 	if err != nil {
 		fmt.Println("Error connecting to Redis:", err)
@@ -46,6 +55,8 @@ func main() {
 
 	// UNPROTECTED ROUTES
 	r := gin.Default()
+	r.MaxMultipartMemory = 8 << 20 // 8 MiB
+
 	authGroup := r.Group("/api/auth")
 	{
 		authGroup.POST("/google/login", authhandler.GoogleLoginHandler(storage, jwtMaker, redisClient))
@@ -67,7 +78,7 @@ func main() {
 	userGroup := r.Group("/api/user")
 	userGroup.Use(middleware.AuthMiddleware(jwtMaker))
 	{
-
+		userGroup.POST("/upload/image", userhandler.UploadImageHandler(storage, s3Client))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

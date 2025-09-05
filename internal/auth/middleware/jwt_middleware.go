@@ -12,7 +12,7 @@ import (
 func AuthMiddleware(jwtMaker *token.JWTMaker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-
+		// fmt.Println("authHeader", authHeader)
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing or invalid"})
 			return

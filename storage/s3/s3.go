@@ -1,13 +1,12 @@
 package s3
 
 import (
-	"bytes"
 	"context"
-	"image"
-	"image/jpeg"
-	"io"
+	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -70,29 +69,29 @@ func (repo Repo) DeleteObject(bucketName string, objectKey string, lifetimeSecs 
 	return request, err
 }
 
-func (repo Repo) UploadFile(file image.Image, url string) error {
-	var buf bytes.Buffer
-	err := jpeg.Encode(&buf, file, nil)
-	if err != nil {
-		return nil
-	}
-	body := io.Reader(&buf)
-	request, err := http.NewRequest(http.MethodPut, url, body)
-	if err != nil {
-		return err
-	}
+// func (repo Repo) UploadFile(file image.Image, url string) error {
+// 	var buf bytes.Buffer
+// 	err := jpeg.Encode(&buf, file, nil)
+// 	if err != nil {
+// 		return nil
+// 	}
+// 	body := io.Reader(&buf)
+// 	request, err := http.NewRequest(http.MethodPut, url, body)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	request.Header.Set("Content-Type", "image/jpeg")
+// 	request.Header.Set("Content-Type", "image/jpeg")
 
-	client := &http.Client{}
-	resp, err := client.Do(request)
-	if err != nil {
-		log.Println("Error sending request:", err)
-		return err
-	}
-	defer resp.Body.Close()
-	return err
-}
+// 	client := &http.Client{}
+// 	resp, err := client.Do(request)
+// 	if err != nil {
+// 		log.Println("Error sending request:", err)
+// 		return err
+// 	}
+// 	defer resp.Body.Close()
+// 	return err
+// }
 
 func (repo Repo) DeleteFile(url string) error {
 	request, err := http.NewRequest(http.MethodDelete, url, nil)
@@ -106,4 +105,21 @@ func (repo Repo) DeleteFile(url string) error {
 
 	log.Printf("Delete Request Response status code: %v", response.StatusCode)
 	return err
+}
+
+func (repo Repo) UploadFile(fileName string, file multipart.File) (string, error) {
+	_, err := repo.s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(os.Getenv("R2_BUCKET_NAME")),
+		Key:    aws.String(fileName),
+		Body:   file,
+	})
+	if err != nil {
+		return "", err
+	}
+	url := fmt.Sprintf("https://%s/%s/%s",
+		os.Getenv("R2_ACCOUNT_ID")+".r2.cloudflarestorage.com",
+		os.Getenv("R2_BUCKET_NAME"),
+		fileName,
+	)
+	return url, nil
 }
