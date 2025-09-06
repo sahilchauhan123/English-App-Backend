@@ -35,6 +35,7 @@ type User struct {
 	// CreatedAt  string   `json:"created_at,omitempty"`         // Set on backend
 	CreatedAt pgtype.Timestamptz `json:"created_at,omitempty"` // <-- CHANGE THIS LINE
 	Otp       string             `json:"otp,omitempty"`
+	Pictures  []string           `json:"pictures,omitempty"`
 }
 
 // gender: '',   				DONE

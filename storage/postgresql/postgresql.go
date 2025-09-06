@@ -29,7 +29,6 @@ func New() (*PostgreSQL, error) {
 	}
 	createTableQuery := `
 		DROP TABLE IF EXISTS users;
-
 		CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
 		full_name TEXT NOT NULL,
@@ -44,7 +43,7 @@ func New() (*PostgreSQL, error) {
 		native_language TEXT NOT NULL,
 		current_english_level TEXT NOT NULL,
 		created_at TIMESTAMPTZ DEFAULT NOW(),
-		pictures TEXT[]
+    	pictures TEXT[] DEFAULT '{}'
 		);
 `
 
@@ -54,7 +53,6 @@ func New() (*PostgreSQL, error) {
 	}
 
 	createTableQuery = ` 
-	DROP TABLE IF EXISTS refresh_tokens;
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id INT PRIMARY KEY,
 		refresh_token TEXT NOT NULL
@@ -65,7 +63,6 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create refersh_tokens table: %v", err)
 	}
 	createTableQuery = `
-	DROP TABLE IF EXISTS call_sessions;
 	CREATE TABLE IF NOT EXISTS call_sessions (
     	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
     	peer1_id BIGINT NOT NULL,
@@ -145,7 +142,7 @@ func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 
 	insertQuery := `INSERT INTO users (
 		full_name, username, email, age, gender, profile_pic, password,
-		auth_type, main_challenge, native_language, current_english_level
+		auth_type, main_challenge, native_language, current_english_level 
 	) VALUES (
 		$1, $2, $3, $4, $5, $6, $7,
 		$8, $9, $10, $11
@@ -238,23 +235,48 @@ func (p *PostgreSQL) EndCall(id int64) error {
 }
 
 func (p *PostgreSQL) InsertPicture(id int64, imageUrl string) error {
-
-	// check length first should be < 5  in postgresql
-	var pictures []string
-	checkQuery := `SELECT pictures FROM users WHERE id = $1;`
-	err := p.Db.QueryRow(context.Background(), checkQuery, id).Scan(&pictures)
-	if err != nil {
-		return fmt.Errorf("error checking pictures: %v", err)
-	}
-	if len(pictures) > 5 {
-		return fmt.Errorf("cannot upload more than 5 pictures")
-	}
-
-	// insert picture
 	query := `UPDATE users SET pictures = array_append(pictures, $1) WHERE id = $2;`
-	_, err = p.Db.Exec(context.Background(), query, imageUrl, id)
+	_, err := p.Db.Exec(context.Background(), query, imageUrl, id)
 	if err != nil {
 		return fmt.Errorf("error inserting picture: %v", err)
 	}
 	return nil
+}
+
+func (p *PostgreSQL) CheckPictureLength(id int64) (int, error) {
+	var pictures []string
+	checkQuery := `SELECT pictures FROM users WHERE id = $1;`
+	err := p.Db.QueryRow(context.Background(), checkQuery, id).Scan(&pictures)
+	if err != nil {
+		return 0, fmt.Errorf("error checking pictures length: %v", err)
+	}
+
+	fmt.Println("Pictures array length:", len(pictures))
+	return len(pictures), nil
+}
+
+func (p *PostgreSQL) GetProfile(userID int64) (types.User, error) {
+	var profile types.User
+	query := `SELECT 
+		id, full_name, username, email, age, gender, profile_pic, 
+		created_at, main_challenge, native_language, current_english_level,pictures
+		FROM users WHERE id = $1;`
+	err := p.Db.QueryRow(context.Background(), query, userID).Scan(
+		&profile.Id,
+		&profile.FullName,
+		&profile.Username,
+		&profile.Email,
+		&profile.Age,
+		&profile.Gender,
+		&profile.ProfilePic,
+		&profile.CreatedAt,
+		&profile.MainChallenge,
+		&profile.NativeLanguage,
+		&profile.CurrentEnglishLevel,
+		&profile.Pictures,
+	)
+	if err != nil {
+		return types.User{}, fmt.Errorf("error fetching profile: %v", err)
+	}
+	return profile, nil
 }

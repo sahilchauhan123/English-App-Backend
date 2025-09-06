@@ -13,4 +13,6 @@ type Storage interface {
 	CheckToken(token string) (bool, int64)
 	EndCall(id int64) error
 	InsertPicture(id int64, imageUrl string) error
+	CheckPictureLength(id int64) (int, error)
+	GetProfile(id int64) (types.User, error)
 }

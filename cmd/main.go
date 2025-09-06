@@ -79,6 +79,7 @@ func main() {
 	userGroup.Use(middleware.AuthMiddleware(jwtMaker))
 	{
 		userGroup.POST("/upload/image", userhandler.UploadImageHandler(storage, s3Client))
+		userGroup.GET("/profile", userhandler.GetProfileHandler(storage))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

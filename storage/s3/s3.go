@@ -116,10 +116,6 @@ func (repo Repo) UploadFile(fileName string, file multipart.File) (string, error
 	if err != nil {
 		return "", err
 	}
-	url := fmt.Sprintf("https://%s/%s/%s",
-		os.Getenv("R2_ACCOUNT_ID")+".r2.cloudflarestorage.com",
-		os.Getenv("R2_BUCKET_NAME"),
-		fileName,
-	)
+	url := fmt.Sprint(os.Getenv("R2_PUBLIC_URL"), "/", fileName)
 	return url, nil
 }
