@@ -409,12 +409,14 @@ func ResetPasswordHandler(db storage.Storage, redis *redis.RedisClient) gin.Hand
 
 func UpdateTokenHandler(db storage.Storage, redis *redis.RedisClient, jwtMaker token.JWTMaker) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		fmt.Println("inside update token handler")
 		var token Token
 		err := c.ShouldBindJSON(&token)
 		if err != nil {
 			fmt.Println("error in  UpdateTokenHandler : ", err)
 			response.Failed(c, http.StatusBadRequest, "invalid request")
 		}
+
 		id, err := authservice.HandleUpdateAccessToken(token.RefreshToken, db, *redis)
 		if err != nil {
 			response.Failed(c, http.StatusUnauthorized, err.Error())
@@ -425,12 +427,14 @@ func UpdateTokenHandler(db storage.Storage, redis *redis.RedisClient, jwtMaker t
 			response.Failed(c, http.StatusInternalServerError, "Failed to create access token")
 			return
 		}
+
 		// STORE TO REDIS
 		err = redis.Client.Set(ctx, fmt.Sprintf("access_token:%d", id), accessToken, time.Hour*24*3).Err()
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, fmt.Errorf("failed to store access token in redis: %v", err).Error())
 			return
 		}
+
 		response.Success(c, map[string]any{
 			"id":          id,
 			"accessToken": accessToken,

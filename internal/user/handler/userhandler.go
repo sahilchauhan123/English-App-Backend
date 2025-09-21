@@ -8,6 +8,7 @@ import (
 	"github/english-app/storage/s3"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -113,6 +114,31 @@ func GetProfileHandler(db storage.Storage) gin.HandlerFunc {
 		userid := c.MustGet("user_id").(int64)
 
 		profile, err := userservice.GetProfile(userid, db)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"success": true,
+			"profile": profile,
+		})
+	}
+}
+
+func GetOtherUserProfileHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		userId, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+		}
+		//checking if same user requested the other user profile
+		if userId == c.MustGet("user_id").(int64) {
+			response.Failed(c, http.StatusInternalServerError, "trying to request own id")
+		}
+
+		profile, err := userservice.GetProfile(userId, db)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
 			return

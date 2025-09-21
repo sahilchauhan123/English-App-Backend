@@ -28,7 +28,6 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	createTableQuery := `
-		DROP TABLE IF EXISTS users;
 		CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
 		full_name TEXT NOT NULL,

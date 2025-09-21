@@ -843,6 +843,24 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 				FromUserData: allClientsData[msg.From],
 			}
 
+		case "refreshList":
+			id := msg.From
+			target := clients[id]
+			usersList, err := ShowRelatedUsersList(id)
+			if err != nil {
+				target.Send <- map[string]any{
+					"usersCount": len(usersList),
+					"error":      err.Error(),
+				}
+				fmt.Println("err in refresh list :", err.Error())
+				break
+			}
+			target.Send <- map[string]any{
+				"type":       "newUsersList",
+				"usersCount": len(usersList),
+				"usersList":  usersList,
+			}
+
 		default:
 			continue
 		}
@@ -892,8 +910,10 @@ func ShowRelatedUsersList(id int64) ([]types.User, error) {
 	defer mutex.RUnlock()
 	var msg []types.User
 	maxCounter := 0
-	if len(availableClientsData) < 1 {
-		return msg, fmt.Errorf("Users are not Online at this time")
+	fmt.Println("online users : ", len(availableClientsData))
+	if len(availableClientsData) < 2 {
+		fmt.Println("No Users are Online at this time")
+		return msg, fmt.Errorf(" No Users are Online at this time")
 	}
 
 	// Only show users that are actually connected

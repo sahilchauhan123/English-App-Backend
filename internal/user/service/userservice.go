@@ -62,8 +62,16 @@ func DetectFileType(file *multipart.FileHeader) (string, error) {
 	return detectedType, nil
 }
 
-func GetProfile(userID int64, db storage.Storage) (types.User, error) {
-	profile, err := db.GetProfile(userID)
+func GetProfile(userId int64, db storage.Storage) (types.User, error) {
+	profile, err := db.GetProfile(userId)
+	if err != nil {
+		return types.User{}, err
+	}
+	return profile, nil
+}
+
+func GetOtherUserProfil(userId int64, db storage.Storage) (types.User, error) {
+	profile, err := db.GetProfile(userId)
 	if err != nil {
 		return types.User{}, err
 	}
