@@ -15,4 +15,5 @@ type Storage interface {
 	InsertPicture(id int64, imageUrl string) error
 	CheckPictureLength(id int64) (int, error)
 	GetProfile(id int64) (types.User, error)
+	GetCallHistory(id int64) ([]types.CallHistory, error)
 }

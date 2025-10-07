@@ -891,20 +891,26 @@ func findAUser(id int64) (int64, error) {
 	waitingForCallClients[id] = availableClientsData[id]
 	delete(availableClientsData, id)
 
-	go func(uid int64) {
-		time.Sleep(2 * time.Minute)
-		mutex.Lock()
-		defer mutex.Unlock()
-		// Check if user is still connected before moving back to available
-		if _, exists := clients[uid]; exists {
-			availableClientsData[uid] = allClientsData[uid]
-		}
-		delete(waitingForCallClients, uid)
-	}(id)
+	go maximumWaitingTimeExceededChecker(id)
 
 	return 0, errors.New("did not find any user")
 }
 
+func maximumWaitingTimeExceededChecker(uid int64) {
+	// Maximum wait time of 2 minutes in random matching
+	time.Sleep(2 * time.Minute)
+	mutex.Lock()
+	defer mutex.Unlock()
+	// Check if user is still connected before moving back to available
+	if _, stillWaiting := waitingForCallClients[uid]; stillWaiting {
+		delete(waitingForCallClients, uid)
+		if _, isConnected := clients[uid]; isConnected {
+			// User disconnected while waiting
+			availableClientsData[uid] = allClientsData[uid]
+			fmt.Println("User", uid, "timed out after 2 mins, moved to idle.")
+		}
+	}
+}
 func ShowRelatedUsersList(id int64) ([]types.User, error) {
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -923,7 +929,9 @@ func ShowRelatedUsersList(id int64) ([]types.User, error) {
 		}
 
 		// Verify user is still connected
-		if _, exists := clients[userID]; exists && userID != id {
+		_, exists := clients[userID]
+
+		if exists && userID != id {
 			msg = append(msg, data)
 			maxCounter++
 		}

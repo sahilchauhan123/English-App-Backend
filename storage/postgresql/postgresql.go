@@ -6,8 +6,10 @@ import (
 	authservice "github/english-app/internal/auth/service"
 	"github/english-app/internal/types"
 	"os"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -122,12 +124,18 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 }
 
 func (p *PostgreSQL) CheckUsernameIsAvailable(username string) bool {
-	checkQuery := `SELECT email FROM users WHERE username = $1;`
+
 	var output string
+	checkQuery := `SELECT email FROM users WHERE username = $1;`
+	username = strings.TrimSpace(strings.ToLower(username))
+
 	err := p.Db.QueryRow(context.Background(), checkQuery, username).Scan(&output)
+	fmt.Println("Username check query result:", output, "Error:", err)
 	if err == pgx.ErrNoRows {
+		fmt.Println("Username is available:", username)
 		return true
 	}
+	fmt.Println("Username is taken:", username)
 	return false
 }
 
@@ -138,6 +146,7 @@ func (p *PostgreSQL) SaveUserInDatabase(user *types.User) error {
 		return fmt.Errorf("failed to hash password: %v", err)
 	}
 	user.Password = hashedPassword
+	user.Username = strings.TrimSpace(strings.ToLower(user.Username))
 
 	insertQuery := `INSERT INTO users (
 		full_name, username, email, age, gender, profile_pic, password,
@@ -228,6 +237,9 @@ func (p *PostgreSQL) EndCall(id int64) error {
 	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing;`
 	_, err := p.Db.Exec(context.Background(), query, id)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil // No ongoing call to end, so just return nil
+		}
 		return fmt.Errorf("error ending call: %v", err)
 	}
 	return nil
@@ -278,4 +290,52 @@ func (p *PostgreSQL) GetProfile(userID int64) (types.User, error) {
 		return types.User{}, fmt.Errorf("error fetching profile: %v", err)
 	}
 	return profile, nil
+}
+
+func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
+	query := `SELECT * FROM call_sessions
+	WHERE peer1_id = $1 OR peer2_id = $1
+	LIMIT 50
+	ORDER BY started_at DESC;`
+
+	rows, err := p.Db.Query(context.Background(), query, userId)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching call history: %v", err)
+	}
+
+	var history []types.CallHistory
+	for rows.Next() {
+		var record types.CallHistory
+		var endedAt pgtype.Timestamptz
+		var durationSeconds float64
+
+		err := rows.Scan(
+			&record.PeerID,
+			&record.CallStart,
+			&endedAt,
+			&durationSeconds,
+			&record.Status,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning call history row: %v", err)
+		}
+
+		if endedAt.Valid {
+			record.CallEnd = endedAt.Time.Format("2006-01-02 15:04:05")
+		} else {
+			record.CallEnd = "ongoing"
+		}
+
+		minutes := int(durationSeconds) / 60
+		seconds := int(durationSeconds) % 60
+		record.Duration = fmt.Sprintf("%02d:%02d", minutes, seconds)
+
+		history = append(history, record)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error iterating call history rows: %v", rows.Err())
+	}
+
+	return history, nil
 }

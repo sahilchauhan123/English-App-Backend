@@ -150,3 +150,20 @@ func GetOtherUserProfileHandler(db storage.Storage) gin.HandlerFunc {
 		})
 	}
 }
+
+func GetCallHistoryHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userid := c.MustGet("user_id").(int64)
+
+		history, err := userservice.GetCallHistory(userid, db)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"success": true,
+			"history": history,
+		})
+	}
+}

@@ -81,6 +81,7 @@ func main() {
 		userGroup.POST("/upload/image", userhandler.UploadImageHandler(storage, s3Client))
 		userGroup.GET("/profile", userhandler.GetProfileHandler(storage))
 		userGroup.GET("/userprofile/:id", userhandler.GetOtherUserProfileHandler(storage))
+		userGroup.GET("/call/history", userhandler.GetCallHistoryHandler(storage))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

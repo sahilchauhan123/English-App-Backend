@@ -62,3 +62,11 @@ type GoogleAccountCreate struct {
 	CurrentEnglishLevel string `json:"currentEnglishLevel" binding:"required"`
 	MainChallenge       string `json:"mainChallenge" binding:"required"`
 }
+
+type CallHistory struct {
+	PeerID    int64  `json:"peer_id"`
+	CallStart string `json:"call_start"`
+	CallEnd   string `json:"call_end"`
+	Duration  string `json:"duration"`
+	Status    string `json:"status"`
+}

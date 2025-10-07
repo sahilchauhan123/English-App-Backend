@@ -307,6 +307,7 @@ func CheckUsernameIsAvailable(db storage.Storage, redis *redis.RedisClient) gin.
 			response.Success(c, res)
 			return
 		}
+
 		res := Res{
 			IsRegistered: false,
 			Message:      "Username is available",

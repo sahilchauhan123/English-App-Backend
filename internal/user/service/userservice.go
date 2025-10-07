@@ -70,10 +70,10 @@ func GetProfile(userId int64, db storage.Storage) (types.User, error) {
 	return profile, nil
 }
 
-func GetOtherUserProfil(userId int64, db storage.Storage) (types.User, error) {
-	profile, err := db.GetProfile(userId)
+func GetCallHistory(userId int64, db storage.Storage) ([]types.CallSession, error) {
+	history, err := db.GetCallHistory(userId)
 	if err != nil {
-		return types.User{}, err
+		return nil, err
 	}
-	return profile, nil
+	return history, nil
 }
