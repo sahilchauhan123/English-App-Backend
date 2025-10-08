@@ -70,7 +70,7 @@ func GetProfile(userId int64, db storage.Storage) (types.User, error) {
 	return profile, nil
 }
 
-func GetCallHistory(userId int64, db storage.Storage) ([]types.CallSession, error) {
+func GetCallHistory(userId int64, db storage.Storage) ([]types.CallHistory, error) {
 	history, err := db.GetCallHistory(userId)
 	if err != nil {
 		return nil, err

@@ -11,7 +11,7 @@ type Storage interface {
 	ChangePassword(email string, newPassword string) error
 	StartCall(peer1, peer2 int64) (string, error)
 	CheckToken(token string) (bool, int64)
-	EndCall(id int64) error
+	EndCall(id string) error
 	InsertPicture(id int64, imageUrl string) error
 	CheckPictureLength(id int64) (int, error)
 	GetProfile(id int64) (types.User, error)

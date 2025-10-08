@@ -213,11 +213,12 @@ func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
 
 func (p *PostgreSQL) StartCall(peer1, peer2 int64) (string, error) {
 	var id string
-	query := `INSERT INTO call_sessions (peer1, peer2) VALUES ($1, $2) RETURNING id;`
+	query := `INSERT INTO call_sessions (peer1_id, peer2_id) VALUES ($1, $2) RETURNING id;`
 	err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("error starting call: %v", err)
 	}
+	fmt.Println("call started with id:", id)
 	return id, nil
 }
 
@@ -233,8 +234,8 @@ func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
 	return true, id
 }
 
-func (p *PostgreSQL) EndCall(id int64) error {
-	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing;`
+func (p *PostgreSQL) EndCall(id string) error {
+	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing';`
 	_, err := p.Db.Exec(context.Background(), query, id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -295,8 +296,8 @@ func (p *PostgreSQL) GetProfile(userID int64) (types.User, error) {
 func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
 	query := `SELECT * FROM call_sessions
 	WHERE peer1_id = $1 OR peer2_id = $1
-	LIMIT 50
-	ORDER BY started_at DESC;`
+	ORDER BY started_at DESC
+	LIMIT 50;`
 
 	rows, err := p.Db.Query(context.Background(), query, userId)
 	if err != nil {

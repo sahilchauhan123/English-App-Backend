@@ -578,7 +578,7 @@ type Message struct {
 	From         int64      `json:"from,omitempty"`
 	FromUserData any        `json:"fromUserData,omitempty"`
 	RandomCall   bool       `json:"randomCall,omitempty"`
-	CallId       int64      `json:"callId,omitempty"`
+	CallId       string     `json:"callId,omitempty"`
 }
 
 // Client wraps a websocket connection with a send channel
@@ -778,6 +778,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 			fmt.Printf("%s got connected to %s", allClientsData[From].FullName, allClientsData[peerID].FullName)
 
 		case "endCall":
+			fmt.Println("End Call Message Received for Call ID:", msg.CallId)
 			// Check if target user is connected
 			if !isUserConnected(msg.Target) {
 				log.Printf("❌ Target user %d is offline during endCall", msg.Target)
@@ -805,7 +806,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 				FromUserData: allClientsData[msg.From],
 			}
 			//Update in database Call Ended
-			go func(uid int64) {
+			go func(uid string) {
 				err := db.EndCall(uid)
 				if err != nil {
 					fmt.Println("error in end call ", err)
