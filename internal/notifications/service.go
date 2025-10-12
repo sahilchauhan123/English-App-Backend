@@ -40,8 +40,6 @@ func SendToToken(app *firebase.App) {
 			Body:  "Your next class starts at 2:45 PM in Room 101.",
 		},
 		Data: map[string]string{
-			"score": "850",
-			"time":  "2:45",
 			"title": "Upcoming Lecture 🔔",
 			"body":  "Your next class starts at 2:45 PM in Room 101.",
 		},

@@ -5,6 +5,7 @@ import (
 	authhandler "github/english-app/internal/auth/handler"
 	"github/english-app/internal/auth/middleware"
 	"github/english-app/internal/auth/token"
+	"github/english-app/internal/notifications"
 	"github/english-app/internal/signalling"
 	userhandler "github/english-app/internal/user/handler"
 	"github/english-app/storage/postgresql"
@@ -21,6 +22,10 @@ func main() {
 
 	// ENV LOADING
 	_ = godotenv.Load()
+
+	// FIREBASE initialization
+	filePath := "strango.json"
+	notifications.EnsureFirebaseKeyFile(filePath)
 
 	// JWT MAKER
 	jwtMaker := token.NewJWTMaker(os.Getenv("JWTTOKEN_SECRET"))
