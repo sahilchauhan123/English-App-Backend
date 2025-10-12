@@ -5,7 +5,6 @@ import (
 	"fmt"
 	authservice "github/english-app/internal/auth/service"
 	"github/english-app/internal/auth/token"
-	"github/english-app/internal/notifications"
 	"github/english-app/storage/redis"
 	"time"
 
@@ -308,8 +307,10 @@ func CheckUsernameIsAvailable(db storage.Storage, redis *redis.RedisClient) gin.
 			response.Success(c, res)
 			return
 		}
-		app := notifications.InitializeAppWithServiceAccount()
-		notifications.SendToToken(app)
+		// just for testing notification
+		// REMOVE THIS IN PRODUCTION
+		// app := notifications.InitializeAppWithServiceAccount()
+		// notifications.SendToToken(app)
 		res := Res{
 			IsRegistered: false,
 			Message:      "Username is available",
