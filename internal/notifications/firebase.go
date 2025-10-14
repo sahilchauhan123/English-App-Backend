@@ -24,7 +24,6 @@ type ServiceAccount struct {
 
 // Creates strango.json at startup if missing
 func EnsureFirebaseKeyFile(filePath string) {
-
 	if _, err := os.Stat(filePath); err == nil {
 		return
 	}

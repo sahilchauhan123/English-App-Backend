@@ -6,6 +6,7 @@ import (
 	"github/english-app/internal/auth/middleware"
 	"github/english-app/internal/auth/token"
 	"github/english-app/internal/notifications"
+	service "github/english-app/internal/rateLimiting"
 	"github/english-app/internal/signalling"
 	userhandler "github/english-app/internal/user/handler"
 	"github/english-app/storage/postgresql"
@@ -58,9 +59,13 @@ func main() {
 		return
 	}
 
-	// UNPROTECTED ROUTES
+	// ROUTER
 	r := gin.Default()
+	// RATE LIMITER
+	r.Use(service.RateLimiter())
+
 	r.MaxMultipartMemory = 8 << 20 // 8 MiB
+	// UNPROTECTED ROUTES
 
 	authGroup := r.Group("/api/auth")
 	{
