@@ -35,14 +35,6 @@ func SendToToken(app *firebase.App) {
 		Token: registrationToken,
 
 		// ✅ 1. Add both notification + data
-		Notification: &messaging.Notification{
-			Title: "Upcoming Lecture 🔔",
-			Body:  "Your next class starts at 2:45 PM in Room 101.",
-		},
-		Data: map[string]string{
-			"title": "Upcoming Lecture 🔔",
-			"body":  "Your next class starts at 2:45 PM in Room 101.",
-		},
 
 		// ✅ 2. Android config for heads-up behavior
 		Android: &messaging.AndroidConfig{

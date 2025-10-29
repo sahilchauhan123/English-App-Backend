@@ -2,7 +2,6 @@ package userhandler
 
 import (
 	"fmt"
-	"github/english-app/internal/notifications"
 	"github/english-app/internal/response"
 	userservice "github/english-app/internal/user/service"
 	"github/english-app/storage"
@@ -113,8 +112,8 @@ func UploadImageHandler(db storage.Storage, s3 *s3.Repo) gin.HandlerFunc {
 func GetProfileHandler(db storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userid := c.MustGet("user_id").(int64)
-		app := notifications.InitializeAppWithServiceAccount()
-		notifications.SendToToken(app)
+		// app := notifications.InitializeAppWithServiceAccount()
+		// notifications.SendToToken(app)
 		profile, err := userservice.GetProfile(userid, db)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
@@ -166,6 +165,68 @@ func GetCallHistoryHandler(db storage.Storage) gin.HandlerFunc {
 		response.Success(c, map[string]any{
 			"success": true,
 			"history": history,
+		})
+	}
+}
+
+func DeleteAccountHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userid := c.MustGet("user_id").(int64)
+
+		err := userservice.DeleteAccount(userid, db)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"success": true,
+			"message": "Account deleted successfully",
+		})
+	}
+}
+
+func DeletePictureHandler(db storage.Storage, s3 *s3.Repo) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userid := c.MustGet("user_id").(int64)
+		picUrl := c.Query("url")
+		if picUrl == "" {
+			response.Failed(c, http.StatusBadRequest, "No picture URL provided")
+			return
+		}
+
+		err := userservice.DeletePicture(userid, picUrl, db)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"success": true,
+			"message": "Picture deleted successfully",
+		})
+	}
+}
+
+func BlockUserHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		value := c.Query("id")
+		blockUserId, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+		}
+
+		userid := c.MustGet("user_id").(int64)
+
+		err = db.BlockUser(userid, blockUserId)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+		}
+
+		response.Success(c, map[string]any{
+			"success": true,
+			"message": "User blocked successfully",
 		})
 	}
 }

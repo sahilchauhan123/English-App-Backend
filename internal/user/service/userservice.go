@@ -77,3 +77,27 @@ func GetCallHistory(userId int64, db storage.Storage) ([]types.CallHistory, erro
 	}
 	return history, nil
 }
+
+func DeleteAccount(userId int64, db storage.Storage) error {
+	err := db.DeleteAccount(userId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeletePicture(userId int64, imageUrl string, db storage.Storage) error {
+	err := db.DeletePicture(userId, imageUrl)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func BlockUser(userid int64, blockUserId int64, db storage.Storage) error {
+	err := db.BlockUser(userid, blockUserId)
+	if err != nil {
+		return err
+	}
+	return nil
+}

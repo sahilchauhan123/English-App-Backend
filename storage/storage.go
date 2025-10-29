@@ -16,4 +16,7 @@ type Storage interface {
 	CheckPictureLength(id int64) (int, error)
 	GetProfile(id int64) (types.User, error)
 	GetCallHistory(id int64) ([]types.CallHistory, error)
+	DeleteAccount(id int64) error
+	DeletePicture(userId int64, imageUrl string) error
+	BlockUser(userId int64, blockUserId int64) error
 }

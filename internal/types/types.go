@@ -36,6 +36,7 @@ type User struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at,omitempty"` // <-- CHANGE THIS LINE
 	Otp       string             `json:"otp,omitempty"`
 	Pictures  []string           `json:"pictures,omitempty"`
+	Is_active bool               `json:"is_active,omitempty"`
 }
 
 // gender: '',   				DONE
@@ -64,9 +65,11 @@ type GoogleAccountCreate struct {
 }
 
 type CallHistory struct {
-	PeerID    int64  `json:"peer_id"`
+	CallId    string `json:"call_id,omitempty"`
+	PeerID1   int64  `json:"peer_id1"`
 	CallStart string `json:"call_start"`
 	CallEnd   string `json:"call_end"`
-	Duration  string `json:"duration"`
+	PeerID2   int64  `json:"peer_id2"`
 	Status    string `json:"status"`
+	Duration  string `json:"duration"`
 }

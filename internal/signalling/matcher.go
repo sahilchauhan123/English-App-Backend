@@ -850,6 +850,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 			usersList, err := ShowRelatedUsersList(id)
 			if err != nil {
 				target.Send <- map[string]any{
+					"type":       "newUsersList",
 					"usersCount": len(usersList),
 					"error":      err.Error(),
 				}

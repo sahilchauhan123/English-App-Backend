@@ -63,6 +63,7 @@ func main() {
 	r := gin.Default()
 	// RATE LIMITER
 	r.Use(service.RateLimiter())
+	go service.CleanupVisitors() // launch the cleanup goroutine
 
 	r.MaxMultipartMemory = 8 << 20 // 8 MiB
 	// UNPROTECTED ROUTES
@@ -92,6 +93,9 @@ func main() {
 		userGroup.GET("/profile", userhandler.GetProfileHandler(storage))
 		userGroup.GET("/userprofile/:id", userhandler.GetOtherUserProfileHandler(storage))
 		userGroup.GET("/call/history", userhandler.GetCallHistoryHandler(storage))
+		userGroup.GET("/account/delete", userhandler.DeleteAccountHandler(storage))
+		userGroup.GET("/picture/delete", userhandler.DeletePictureHandler(storage, s3Client))
+		userGroup.GET("/block/:id", userhandler.BlockUserHandler(storage))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

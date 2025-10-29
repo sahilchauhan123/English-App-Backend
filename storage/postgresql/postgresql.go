@@ -44,7 +44,8 @@ func New() (*PostgreSQL, error) {
 		native_language TEXT NOT NULL,
 		current_english_level TEXT NOT NULL,
 		created_at TIMESTAMPTZ DEFAULT NOW(),
-    	pictures TEXT[] DEFAULT '{}'
+    	pictures TEXT[] DEFAULT '{}',
+		is_active BOOl DEFAULT TRUE
 		);
 `
 
@@ -77,6 +78,20 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create call_sessions table: %v", err)
 	}
 
+	createTableQuery = `
+	CREATE TABLE IF NOT EXISTS blocks (
+		user_id INT NOT NULL,
+		blocked_by INT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		PRIMARY KEY (user_id, blocked_by),
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		FOREIGN KEY (blocked_by) REFERENCES users(id)
+	);`
+	_, err = conn.Exec(context.Background(), createTableQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blocks table: %v", err)
+	}
+
 	err = conn.Ping(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
@@ -94,7 +109,7 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 
 	checkQuery := `SELECT 
 		id, full_name, username, email, age, gender, profile_pic, 
-		created_at, password, auth_type, main_challenge, native_language, current_english_level 
+		created_at, password, auth_type, main_challenge, native_language, current_english_level,pictures
 		FROM users WHERE email = $1;`
 
 	err := p.Db.QueryRow(context.Background(), checkQuery, email).Scan(
@@ -111,6 +126,7 @@ func (p *PostgreSQL) CheckUserInDatabase(email string) (bool, types.User, error)
 		&user.MainChallenge,
 		&user.NativeLanguage,
 		&user.CurrentEnglishLevel,
+		&user.Pictures,
 	)
 
 	if err == pgx.ErrNoRows {
@@ -308,13 +324,15 @@ func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
 	for rows.Next() {
 		var record types.CallHistory
 		var endedAt pgtype.Timestamptz
+		var startedAt pgtype.Timestamptz
 		var durationSeconds float64
 
 		err := rows.Scan(
-			&record.PeerID,
-			&record.CallStart,
+			&record.CallId,
+			&record.PeerID1,
+			&record.PeerID2,
+			&startedAt,
 			&endedAt,
-			&durationSeconds,
 			&record.Status,
 		)
 		if err != nil {
@@ -323,6 +341,8 @@ func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
 
 		if endedAt.Valid {
 			record.CallEnd = endedAt.Time.Format("2006-01-02 15:04:05")
+			record.CallStart = startedAt.Time.Format("2006-01-02 15:04:05")
+			durationSeconds = endedAt.Time.Sub(startedAt.Time).Seconds()
 		} else {
 			record.CallEnd = "ongoing"
 		}
@@ -339,4 +359,38 @@ func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
 	}
 
 	return history, nil
+}
+
+func (p *PostgreSQL) DeleteAccount(id int64) error {
+	query := `UPDATE users SET is_active = FALSE WHERE id = $1;`
+	_, err := p.Db.Query(context.Background(), query, id)
+	if err != nil {
+		return fmt.Errorf("error fetching call history: %v", err)
+	}
+	return nil
+
+}
+
+func (p *PostgreSQL) DeletePicture(userId int64, imageUrl string) error {
+	query := `UPDATE users SET pictures = array_remove(pictures, $1) WHERE id = $2;`
+	_, err := p.Db.Exec(context.Background(), query, imageUrl, userId)
+	if err != nil {
+		return fmt.Errorf("error deleting picture: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgreSQL) BlockUser(userId int64, blockUserId int64) error {
+
+	query := `INSERT INTO blocks (user_id, blocked_by)
+		VALUES ($1,$2)
+		ON CONFLICT (user_id, blocked_by) DO NOTHING;
+	`
+	_, err := p.Db.Exec(context.Background(), query, userId, blockUserId)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
