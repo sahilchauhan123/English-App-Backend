@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -129,15 +130,16 @@ func GetProfileHandler(db storage.Storage) gin.HandlerFunc {
 
 func GetOtherUserProfileHandler(db storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
+
 		id := c.Param("id")
 		userId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
 		}
 		//checking if same user requested the other user profile
-		if userId == c.MustGet("user_id").(int64) {
-			response.Failed(c, http.StatusInternalServerError, "trying to request own id")
-		}
+		// if userId == c.MustGet("user_id").(int64) {
+		// 	response.Failed(c, http.StatusInternalServerError, "trying to request own id")
+		// }
 
 		profile, err := userservice.GetProfile(userId, db)
 		if err != nil {
@@ -155,8 +157,16 @@ func GetOtherUserProfileHandler(db storage.Storage) gin.HandlerFunc {
 func GetCallHistoryHandler(db storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userid := c.MustGet("user_id").(int64)
+		timestampStr := c.Query("timestamp")
+		timestampStr = strings.ReplaceAll(timestampStr, " ", string("T"))
 
-		history, err := userservice.GetCallHistory(userid, db)
+		timestamp, err := time.Parse("2006-01-02T15:04:05", timestampStr)
+		if err != nil && timestampStr != "" {
+			response.Failed(c, http.StatusBadRequest, "Invalid timestamp format")
+			return
+		}
+
+		history, err := userservice.GetCallHistory(userid, db, timestamp)
 		if err != nil {
 			response.Failed(c, http.StatusInternalServerError, err.Error())
 			return
@@ -227,6 +237,26 @@ func BlockUserHandler(db storage.Storage) gin.HandlerFunc {
 		response.Success(c, map[string]any{
 			"success": true,
 			"message": "User blocked successfully",
+		})
+	}
+}
+
+func LeaderboardHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		Duration := c.Query("duration") // daily, weekly, monthly, alltime
+		if Duration == "" {
+			response.Failed(c, http.StatusBadRequest, "Duration is required")
+			return
+		}
+		leaderboard, err := userservice.GetLeaderboard(db, Duration)
+		if err != nil {
+			response.Failed(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		response.Success(c, map[string]any{
+			"success":     true,
+			"leaderboard": leaderboard,
 		})
 	}
 }

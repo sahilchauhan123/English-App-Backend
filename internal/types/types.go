@@ -73,3 +73,12 @@ type CallHistory struct {
 	Status    string `json:"status"`
 	Duration  string `json:"duration"`
 }
+
+type LeaderboardEntry struct {
+	UserData      User    `json:"user_data"`
+	PeriodType    string  `json:"period_type"`
+	PeriodStart   string  `json:"period_start"`
+	TotalDuration float64 `json:"total_duration"`
+	UpdatedAt     string  `json:"updated_at"`
+	Rank          int     `json:"rank"`
+}

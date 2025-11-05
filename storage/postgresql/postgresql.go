@@ -7,6 +7,7 @@ import (
 	"github/english-app/internal/types"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -90,6 +91,40 @@ func New() (*PostgreSQL, error) {
 	_, err = conn.Exec(context.Background(), createTableQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blocks table: %v", err)
+	}
+
+	createTableQuery = `
+		CREATE TABLE IF NOT EXISTS feedback (
+		id SERIAL PRIMARY KEY,
+		feedback_to INT NOT NULL,
+		feedback_from INT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		comments TEXT,
+		rating INT,
+		callID UUID,
+		FOREIGN KEY (feedback_to) REFERENCES users(id),
+		FOREIGN KEY (feedback_from) REFERENCES users(id)
+	);`
+
+	_, err = conn.Exec(context.Background(), createTableQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Feedback table: %v", err)
+	}
+
+	createTableQuery = `
+		CREATE TABLE IF NOT EXISTS leaderboard (
+			user_id BIGINT NOT NULL,
+			period_type TEXT NOT NULL,       -- 'daily', 'weekly', 'monthly', or 'alltime'
+			period_start DATE NOT NULL,      -- date representing the start of that period
+			total_duration BIGINT DEFAULT 0, -- total call duration in seconds
+			updated_at TIMESTAMPTZ DEFAULT now(),
+			PRIMARY KEY (user_id, period_type, period_start)
+		);
+		`
+
+	_, err = conn.Exec(context.Background(), createTableQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create leaderboard table: %v", err)
 	}
 
 	err = conn.Ping(context.Background())
@@ -251,13 +286,33 @@ func (p *PostgreSQL) CheckToken(token string) (bool, int64) {
 }
 
 func (p *PostgreSQL) EndCall(id string) error {
-	query := `UPDATE call_sessions SET status = 'ended', ended_at = NOW() WHERE id = $1 AND status = 'ongoing';`
-	_, err := p.Db.Exec(context.Background(), query, id)
+	var durationSeconds float64
+	var peer1ID, peer2ID int64
+
+	query := `
+		UPDATE call_sessions
+		SET status = 'ended', ended_at = NOW()
+		WHERE id = $1
+		RETURNING 
+			peer1_id,
+			peer2_id,
+			EXTRACT(EPOCH FROM (ended_at - started_at)) AS duration_seconds;`
+
+	err := p.Db.QueryRow(context.Background(), query, id).Scan(&peer1ID, &peer2ID, &durationSeconds)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil // No ongoing call to end, so just return nil
 		}
 		return fmt.Errorf("error ending call: %v", err)
+	}
+	// Update leaderboard for both peers
+	err = p.UpdateLeaderboard(peer1ID, durationSeconds)
+	if err != nil {
+		return fmt.Errorf("error updating leaderboard for peer1: %v", err)
+	}
+	err = p.UpdateLeaderboard(peer2ID, durationSeconds)
+	if err != nil {
+		return fmt.Errorf("error updating leaderboard for peer2: %v", err)
 	}
 	return nil
 }
@@ -309,13 +364,26 @@ func (p *PostgreSQL) GetProfile(userID int64) (types.User, error) {
 	return profile, nil
 }
 
-func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
-	query := `SELECT * FROM call_sessions
-	WHERE peer1_id = $1 OR peer2_id = $1
-	ORDER BY started_at DESC
-	LIMIT 50;`
+func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.CallHistory, error) {
+	var query string
+	var rows pgx.Rows
+	var err error
 
-	rows, err := p.Db.Query(context.Background(), query, userId)
+	if !timestamp.IsZero() {
+		query = `SELECT * FROM call_sessions
+		WHERE (peer1_id = $1 OR peer2_id = $1) AND started_at >= $2
+		ORDER BY started_at DESC
+		LIMIT 50;`
+		fmt.Println("the timestamp is : ", timestamp)
+		rows, err = p.Db.Query(context.Background(), query, userId, timestamp)
+	} else {
+		query = `SELECT * FROM call_sessions
+		WHERE peer1_id = $1 OR peer2_id = $1
+		ORDER BY started_at DESC
+		LIMIT 50;`
+		rows, err = p.Db.Query(context.Background(), query, userId)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("error fetching call history: %v", err)
 	}
@@ -340,8 +408,8 @@ func (p *PostgreSQL) GetCallHistory(userId int64) ([]types.CallHistory, error) {
 		}
 
 		if endedAt.Valid {
-			record.CallEnd = endedAt.Time.Format("2006-01-02 15:04:05")
-			record.CallStart = startedAt.Time.Format("2006-01-02 15:04:05")
+			record.CallEnd = endedAt.Time.UTC().Format("2006-01-02 15:04:05")
+			record.CallStart = startedAt.Time.UTC().Format("2006-01-02 15:04:05")
 			durationSeconds = endedAt.Time.Sub(startedAt.Time).Seconds()
 		} else {
 			record.CallEnd = "ongoing"
@@ -390,6 +458,102 @@ func (p *PostgreSQL) BlockUser(userId int64, blockUserId int64) error {
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+func (p *PostgreSQL) GetLeaderboard(periodType string) ([]types.LeaderboardEntry, error) {
+	// Decide the date truncation dynamically based on the period type
+	var periodStartExpr string
+
+	switch periodType {
+	case "daily":
+		periodStartExpr = "date_trunc('day', NOW())"
+	case "weekly":
+		periodStartExpr = "date_trunc('week', NOW())"
+	case "monthly":
+		periodStartExpr = "date_trunc('month', NOW())"
+	case "alltime":
+		// All-time uses a fixed period_start
+		periodStartExpr = "date '1970-01-01'"
+	default:
+		return nil, fmt.Errorf("invalid period type: %s", periodType)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			RANK() OVER (ORDER BY l.total_duration DESC) AS rank,
+			u.id AS user_id,
+			u.username,
+			u.full_name,
+			u.profile_pic,
+			u.native_language,
+			l.total_duration
+		FROM leaderboard l
+		JOIN users u ON u.id = l.user_id
+		WHERE l.period_type = $1
+		  AND l.period_start = %s
+		ORDER BY l.total_duration DESC
+		LIMIT 10;
+	`, periodStartExpr)
+
+	rows, err := p.Db.Query(context.Background(), query, periodType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leaderboard: %v", err)
+	}
+	defer rows.Close()
+
+	var leaderboard []types.LeaderboardEntry
+	for rows.Next() {
+		var entry types.LeaderboardEntry
+		entry.PeriodStart = periodType
+		err := rows.Scan(
+			&entry.Rank,
+			&entry.UserData.Id,
+			&entry.UserData.Username,
+			&entry.UserData.FullName,
+			&entry.UserData.ProfilePic,
+			&entry.UserData.NativeLanguage,
+			&entry.TotalDuration,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan leaderboard row: %v", err)
+		}
+		leaderboard = append(leaderboard, entry)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error iterating leaderboard rows: %v", rows.Err())
+	}
+
+	return leaderboard, nil
+}
+
+func (p *PostgreSQL) UpdateLeaderboard(userID int64, duration float64) error {
+	now := time.Now()
+
+	periods := []struct {
+		Type  string
+		Start time.Time
+	}{
+		{"daily", time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())},
+		{"weekly", now.AddDate(0, 0, -int(now.Weekday()))}, // start of week
+		{"monthly", time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())},
+		{"alltime", time.Date(1970, 1, 1, 0, 0, 0, 0, now.Location())},
+	}
+
+	for _, pInfo := range periods {
+		query := `
+			INSERT INTO leaderboard (user_id, period_type, period_start, total_duration)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (user_id, period_type, period_start)
+			DO UPDATE SET total_duration = leaderboard.total_duration + EXCLUDED.total_duration;
+		`
+		_, err := p.Db.Exec(context.Background(), query, userID, pInfo.Type, pInfo.Start, duration)
+		if err != nil {
+			return fmt.Errorf("failed to update %s leaderboard: %v", pInfo.Type, err)
+		}
 	}
 
 	return nil

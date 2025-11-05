@@ -70,8 +70,8 @@ func GetProfile(userId int64, db storage.Storage) (types.User, error) {
 	return profile, nil
 }
 
-func GetCallHistory(userId int64, db storage.Storage) ([]types.CallHistory, error) {
-	history, err := db.GetCallHistory(userId)
+func GetCallHistory(userId int64, db storage.Storage, timestamp time.Time) ([]types.CallHistory, error) {
+	history, err := db.GetCallHistory(userId, timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -100,4 +100,12 @@ func BlockUser(userid int64, blockUserId int64, db storage.Storage) error {
 		return err
 	}
 	return nil
+}
+
+func GetLeaderboard(db storage.Storage, duration string) ([]types.LeaderboardEntry, error) {
+	leaderboard, err := db.GetLeaderboard(duration)
+	if err != nil {
+		return nil, err
+	}
+	return leaderboard, nil
 }

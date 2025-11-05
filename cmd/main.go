@@ -96,6 +96,7 @@ func main() {
 		userGroup.GET("/account/delete", userhandler.DeleteAccountHandler(storage))
 		userGroup.GET("/picture/delete", userhandler.DeletePictureHandler(storage, s3Client))
 		userGroup.GET("/block/:id", userhandler.BlockUserHandler(storage))
+		userGroup.GET("/leaderboard", userhandler.LeaderboardHandler(storage))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

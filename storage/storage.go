@@ -1,6 +1,9 @@
 package storage
 
-import "github/english-app/internal/types"
+import (
+	"github/english-app/internal/types"
+	"time"
+)
 
 type Storage interface {
 	CheckUserInDatabase(email string) (bool, types.User, error)
@@ -15,8 +18,10 @@ type Storage interface {
 	InsertPicture(id int64, imageUrl string) error
 	CheckPictureLength(id int64) (int, error)
 	GetProfile(id int64) (types.User, error)
-	GetCallHistory(id int64) ([]types.CallHistory, error)
+	GetCallHistory(id int64, timestamp time.Time) ([]types.CallHistory, error)
 	DeleteAccount(id int64) error
 	DeletePicture(userId int64, imageUrl string) error
 	BlockUser(userId int64, blockUserId int64) error
+	GetLeaderboard(periodType string) ([]types.LeaderboardEntry, error)
+	UpdateLeaderboard(userID int64, duration float64) error
 }
