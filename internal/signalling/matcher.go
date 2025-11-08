@@ -747,7 +747,7 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 			go func() {
 				mutex.Lock()
 				defer mutex.Unlock()
-				callId, err := db.StartCall(msg.Target, msg.From)
+				callId, err := db.StartCall(allClientsData[msg.Target], allClientsData[msg.From])
 				if err != nil {
 					fmt.Println("error in start call ", err)
 				}

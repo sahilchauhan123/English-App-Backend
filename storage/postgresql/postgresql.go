@@ -67,12 +67,18 @@ func New() (*PostgreSQL, error) {
 	}
 	createTableQuery = `
 	CREATE TABLE IF NOT EXISTS call_sessions (
-    	id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- random call ID
-    	peer1_id BIGINT NOT NULL,
-    	peer2_id BIGINT NOT NULL,
-    	started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    	ended_at TIMESTAMPTZ, -- Made nullable, remove DEFAULT now()
-    	status TEXT DEFAULT 'ongoing'  -- optional: 'ended', etc.
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		peer1_id BIGINT NOT NULL,
+		peer2_id BIGINT NOT NULL,
+		peer1_name TEXT NOT NULL,
+		peer2_name TEXT NOT NULL,
+		peer1_pic TEXT,
+		peer2_pic TEXT,
+		started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		ended_at TIMESTAMPTZ,
+		status TEXT DEFAULT 'ongoing',
+		FOREIGN KEY (peer1_id) REFERENCES users(id),
+		FOREIGN KEY (peer2_id) REFERENCES users(id)
 	);`
 	_, err = conn.Exec(context.Background(), createTableQuery)
 	if err != nil {
@@ -262,14 +268,27 @@ func (p *PostgreSQL) ChangePassword(email string, newPassword string) error {
 	return nil
 }
 
-func (p *PostgreSQL) StartCall(peer1, peer2 int64) (string, error) {
+func (p *PostgreSQL) StartCall(peer1, peer2 types.User) (string, error) {
 	var id string
-	query := `INSERT INTO call_sessions (peer1_id, peer2_id) VALUES ($1, $2) RETURNING id;`
-	err := p.Db.QueryRow(context.Background(), query, peer1, peer2).Scan(&id)
+	query := `
+        INSERT INTO call_sessions (
+            peer1_id, peer2_id, 
+            peer1_name, peer2_name,
+            peer1_pic, peer2_pic
+        ) VALUES ($1, $2, $3, $4, $5, $6) 
+        RETURNING id;`
+
+	err := p.Db.QueryRow(
+		context.Background(),
+		query,
+		peer1.Id, peer2.Id,
+		peer1.FullName, peer2.FullName,
+		peer1.ProfilePic, peer2.ProfilePic,
+	).Scan(&id)
+
 	if err != nil {
 		return "", fmt.Errorf("error starting call: %v", err)
 	}
-	fmt.Println("call started with id:", id)
 	return id, nil
 }
 
@@ -364,7 +383,7 @@ func (p *PostgreSQL) GetProfile(userID int64) (types.User, error) {
 	return profile, nil
 }
 
-func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.CallHistory, error) {
+func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.CallRecord, error) {
 	var query string
 	var rows pgx.Rows
 	var err error
@@ -373,14 +392,14 @@ func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.
 		query = `SELECT * FROM call_sessions
 		WHERE (peer1_id = $1 OR peer2_id = $1) AND started_at >= $2
 		ORDER BY started_at DESC
-		LIMIT 50;`
+		LIMIT 25;`
 		fmt.Println("the timestamp is : ", timestamp)
 		rows, err = p.Db.Query(context.Background(), query, userId, timestamp)
 	} else {
 		query = `SELECT * FROM call_sessions
 		WHERE peer1_id = $1 OR peer2_id = $1
 		ORDER BY started_at DESC
-		LIMIT 50;`
+		LIMIT 25;`
 		rows, err = p.Db.Query(context.Background(), query, userId)
 	}
 
@@ -399,6 +418,10 @@ func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.
 			&record.CallId,
 			&record.PeerID1,
 			&record.PeerID2,
+			&record.PeerName1,
+			&record.PeerName2,
+			&record.PeerPic1,
+			&record.PeerPic2,
 			&startedAt,
 			&endedAt,
 			&record.Status,
@@ -417,16 +440,19 @@ func (p *PostgreSQL) GetCallHistory(userId int64, timestamp time.Time) ([]types.
 
 		minutes := int(durationSeconds) / 60
 		seconds := int(durationSeconds) % 60
-		record.Duration = fmt.Sprintf("%02d:%02d", minutes, seconds)
+		record.DurationInMin = fmt.Sprintf("%02d:%02d", minutes, seconds)
 
 		history = append(history, record)
+
 	}
+
+	formattedRecord := FormatCallRecord(history, userId)
 
 	if rows.Err() != nil {
 		return nil, fmt.Errorf("error iterating call history rows: %v", rows.Err())
 	}
 
-	return history, nil
+	return formattedRecord, nil
 }
 
 func (p *PostgreSQL) DeleteAccount(id int64) error {
@@ -557,4 +583,29 @@ func (p *PostgreSQL) UpdateLeaderboard(userID int64, duration float64) error {
 	}
 
 	return nil
+}
+
+func FormatCallRecord(records []types.CallHistory, id int64) []types.CallRecord {
+	var formattedRecords []types.CallRecord
+	var formattedRecord types.CallRecord
+	for _, record := range records {
+		if record.PeerID1 == id {
+			formattedRecord.PeerId = record.PeerID2
+			formattedRecord.PeerPic = record.PeerPic2
+			formattedRecord.PeerName = record.PeerName2
+		} else {
+			formattedRecord.PeerId = record.PeerID1
+			formattedRecord.PeerPic = record.PeerPic1
+			formattedRecord.PeerName = record.PeerName1
+		}
+		formattedRecord.CallEnd = record.CallEnd
+		formattedRecord.CallId = record.CallId
+		formattedRecord.CallStart = record.CallStart
+		formattedRecord.DurationInMin = record.DurationInMin
+		formattedRecord.Status = record.Status
+
+		formattedRecords = append(formattedRecords, formattedRecord)
+	}
+
+	return formattedRecords
 }

@@ -65,14 +65,40 @@ type GoogleAccountCreate struct {
 }
 
 type CallHistory struct {
-	CallId    string `json:"call_id,omitempty"`
-	PeerID1   int64  `json:"peer_id1"`
-	CallStart string `json:"call_start"`
-	CallEnd   string `json:"call_end"`
-	PeerID2   int64  `json:"peer_id2"`
-	Status    string `json:"status"`
-	Duration  string `json:"duration"`
+	CallId        string `json:"call_id"`
+	PeerID1       int64  `json:"peer1_id"`
+	PeerID2       int64  `json:"peer2_id"`
+	PeerName1     string `json:"peer1_name"`
+	PeerName2     string `json:"peer2_name"`
+	PeerPic1      string `json:"peer1_pic"`
+	PeerPic2      string `json:"peer2_pic"`
+	CallStart     string `json:"started_at"`
+	CallEnd       string `json:"ended_at"`
+	Status        string `json:"status"`
+	DurationInMin string `json:"duration_in_min"`
 }
+
+type CallRecord struct {
+	CallId        string `json:"call_id"`
+	PeerId        int64  `json:"peer_id"`
+	PeerName      string `json:"peer_name"`
+	PeerPic       string `json:"peer_pic"`
+	CallStart     string `json:"started_at"`
+	CallEnd       string `json:"ended_at"`
+	Status        string `json:"status"`
+	DurationInMin string `json:"duration_in_min"`
+}
+
+// id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+// peer1_id BIGINT NOT NULL,
+// peer2_id BIGINT NOT NULL,
+// peer1_name TEXT NOT NULL,
+// peer2_name TEXT NOT NULL,
+// peer1_pic TEXT,
+// peer2_pic TEXT,
+// started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+// ended_at TIMESTAMPTZ,
+// status TEXT DEFAULT 'ongoing',
 
 type LeaderboardEntry struct {
 	UserData      User    `json:"user_data"`

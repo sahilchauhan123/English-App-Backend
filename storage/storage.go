@@ -12,13 +12,13 @@ type Storage interface {
 	CheckUsernameIsAvailable(username string) bool
 	DeleteToken(userId int64) error
 	ChangePassword(email string, newPassword string) error
-	StartCall(peer1, peer2 int64) (string, error)
+	StartCall(peer1, peer2 types.User) (string, error)
 	CheckToken(token string) (bool, int64)
 	EndCall(id string) error
 	InsertPicture(id int64, imageUrl string) error
 	CheckPictureLength(id int64) (int, error)
 	GetProfile(id int64) (types.User, error)
-	GetCallHistory(id int64, timestamp time.Time) ([]types.CallHistory, error)
+	GetCallHistory(id int64, timestamp time.Time) ([]types.CallRecord, error)
 	DeleteAccount(id int64) error
 	DeletePicture(userId int64, imageUrl string) error
 	BlockUser(userId int64, blockUserId int64) error
