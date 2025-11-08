@@ -6,6 +6,7 @@ import (
 	authservice "github/english-app/internal/auth/service"
 	"github/english-app/internal/types"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -606,6 +607,6 @@ func FormatCallRecord(records []types.CallHistory, id int64) []types.CallRecord 
 
 		formattedRecords = append(formattedRecords, formattedRecord)
 	}
-
+	slices.Reverse(formattedRecords)
 	return formattedRecords
 }

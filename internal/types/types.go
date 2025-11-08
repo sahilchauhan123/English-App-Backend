@@ -4,20 +4,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// type GoogleUser struct {
-// 	FullName   string    `json:"full_name" binding:"required"`
-// 	Username   string    `json:"username" binding:"required"`
-// 	Id         int64     `json:"id"` // usually not required from client
-// 	Email      string    `json:"email" binding:"required,email"`
-// 	Age        string    `json:"age" binding:"required"`
-// 	Gender     string    `json:"gender" binding:"required"`
-// 	Interests  []string  `json:"interests" binding:"required"`
-// 	CreatedAt  time.Time `json:"created_at"`                         // usually generated server-side
-// 	ProfilePic string    `json:"profile_pic" binding:"required,url"` // URL to the profile picture
-// 	AuthType   string    `json:"auth_type" binding:"required"`       // "google" or "email"
-// 	Password   string    `json:"password,omitempty"`                 // Optional, used for local auth
-// }
-
 type User struct {
 	Id       int64  `json:"id"` // Set by DB
 	FullName string `json:"full_name" binding:"required"`
@@ -38,13 +24,6 @@ type User struct {
 	Pictures  []string           `json:"pictures,omitempty"`
 	Is_active bool               `json:"is_active,omitempty"`
 }
-
-// gender: '',   				DONE
-// nativeLanguage:'',			DONE
-// currentEnglishLevel:'',  	DONE
-// age:'',						DONE
-// mainChallenge:'',			DONE
-// username:''					DONE
 
 type AuthResponse struct {
 	IsRegistered bool   `json:"isRegistered"`
@@ -89,17 +68,6 @@ type CallRecord struct {
 	DurationInMin string `json:"duration_in_min"`
 }
 
-// id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-// peer1_id BIGINT NOT NULL,
-// peer2_id BIGINT NOT NULL,
-// peer1_name TEXT NOT NULL,
-// peer2_name TEXT NOT NULL,
-// peer1_pic TEXT,
-// peer2_pic TEXT,
-// started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-// ended_at TIMESTAMPTZ,
-// status TEXT DEFAULT 'ongoing',
-
 type LeaderboardEntry struct {
 	UserData      User    `json:"user_data"`
 	PeriodType    string  `json:"period_type"`
@@ -107,4 +75,12 @@ type LeaderboardEntry struct {
 	TotalDuration float64 `json:"total_duration"`
 	UpdatedAt     string  `json:"updated_at"`
 	Rank          int     `json:"rank"`
+}
+
+type AiCharacters struct {
+	Id              int8   `json:"id"`
+	Name            string `json:"name"`
+	PicUrl          string `json:"picUrl"`
+	Description     string `json:"description"`
+	BackgroundColor string `json:"backgroundColor"`
 }

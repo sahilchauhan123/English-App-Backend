@@ -260,3 +260,13 @@ func LeaderboardHandler(db storage.Storage) gin.HandlerFunc {
 		})
 	}
 }
+
+func AiCharactersHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		characters := userservice.GetAiCharacters()
+		response.Success(c, map[string]any{
+			"success":    true,
+			"characters": characters,
+		})
+	}
+}

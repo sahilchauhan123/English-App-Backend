@@ -109,3 +109,47 @@ func GetLeaderboard(db storage.Storage, duration string) ([]types.LeaderboardEnt
 	}
 	return leaderboard, nil
 }
+
+func GetAiCharacters() []types.AiCharacters {
+	characters := []types.AiCharacters{
+		{
+			Id:              0,
+			Name:            "Flirty Girl",
+			PicUrl:          "https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/wxnetp7ly2rprc5nxks9.png",
+			Description:     "Talk with her to forget your pain",
+			BackgroundColor: "#F7AEB0",
+		},
+		{
+			Id:              1,
+			Name:            "English Teacher",
+			PicUrl:          "https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/a7uscfnbccswajyfnvnk.png",
+			Description:     "He will help to improve your English",
+			BackgroundColor: "#DA8F7A",
+		},
+		{
+			Id:              2,
+			Name:            "Female Crush",
+			PicUrl:          "https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/c6yx5yjtvolnu05epykf.png",
+			Description:     "Talk with her Sure you will in love with her",
+			BackgroundColor: "#9CCABD",
+		},
+		{
+			Id:              3,
+			Name:            "Motivator",
+			PicUrl:          "https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/ovdqut37etazxo4935ym.png",
+			Description:     "Helps in Motivation and overcoming your fear",
+			BackgroundColor: "#AAC2CC",
+		},
+		{
+			Id:              4,
+			Name:            "Lawyer",
+			PicUrl:          "https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/tvssabzep2mxy8kqdtvf.png",
+			Description:     "Talk and get some advice for your cases",
+			BackgroundColor: "#DDDDD8",
+		},
+	}
+	// DONT FORGET TO ADD THIS TO LIST
+	// https://pub-ab9111ea2a9741bba809ddf443459af8.r2.dev/Group%2022%20(1).png
+
+	return characters
+}
