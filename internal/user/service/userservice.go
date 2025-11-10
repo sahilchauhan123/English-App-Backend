@@ -153,3 +153,21 @@ func GetAiCharacters() []types.AiCharacters {
 
 	return characters
 }
+
+func SaveCallFeedback(feedback types.CallFeedbackRequest, db storage.Storage) error {
+
+	err := db.SaveCallFeedback(feedback)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Feedback saved successfully")
+	return nil
+}
+
+func GetCallFeedback(callID string, db storage.Storage) ([]types.CallFeedbackResponse, error) {
+	feedbacks, err := db.GetCallFeedback(callID)
+	if err != nil {
+		return nil, err
+	}
+	return feedbacks, nil
+}

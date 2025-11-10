@@ -134,6 +134,26 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create leaderboard table: %v", err)
 	}
 
+	createTableQuery = `
+		CREATE TABLE IF NOT EXISTS call_feedback (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			call_id UUID NOT NULL,
+			rater_id BIGINT NOT NULL,
+			rated_user_id BIGINT NOT NULL,
+			stars INT NOT NULL CHECK (stars >= 1 AND stars <= 5),
+			behaviour TEXT[],			
+			comment TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			FOREIGN KEY (call_id) REFERENCES call_sessions(id),
+			FOREIGN KEY (rater_id) REFERENCES users(id),
+			FOREIGN KEY (rated_user_id) REFERENCES users(id)
+		);`
+
+	_, err = conn.Exec(context.Background(), createTableQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create call_feedback table: %v", err)
+	}
+
 	err = conn.Ping(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
@@ -609,4 +629,113 @@ func FormatCallRecord(records []types.CallHistory, id int64) []types.CallRecord 
 	}
 	slices.Reverse(formattedRecords)
 	return formattedRecords
+}
+
+func (p *PostgreSQL) SaveCallFeedback(feedback types.CallFeedbackRequest) error {
+
+	RatedUserID, err := p.GetOtherPeerID(feedback.CallID, feedback.RaterUserID)
+	if err != nil {
+		return err
+	}
+	feedback.RatedUserID = RatedUserID
+
+	query := `
+        INSERT INTO call_feedback (
+            call_id, rater_id, rated_user_id, 
+            stars, behaviour, comment
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+    `
+	_, err = p.Db.Exec(
+		context.Background(),
+		query,
+		feedback.CallID, feedback.RaterUserID, feedback.RatedUserID,
+		feedback.Stars, feedback.Behaviour, feedback.Comment,
+	)
+	if err != nil {
+		return fmt.Errorf("error saving call feedback: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgreSQL) GetCallFeedback(callID string) ([]types.CallFeedbackResponse, error) {
+	query := `
+        SELECT 
+            cf.id,
+            cf.call_id,
+            cf.rater_id,
+            cf.rated_user_id,
+            cf.stars,
+            cf.behaviour,
+            cf.comment,
+            cf.created_at,
+            u.full_name as rater_name,
+            u.profile_pic as rater_pic
+        FROM call_feedback cf
+        JOIN users u ON cf.rater_id = u.id
+        WHERE cf.call_id = $1
+        ORDER BY cf.created_at DESC;
+    `
+
+	rows, err := p.Db.Query(context.Background(), query, callID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching call feedback: %v", err)
+	}
+	defer rows.Close()
+
+	var feedbacks []types.CallFeedbackResponse
+	for rows.Next() {
+		var feedback types.CallFeedbackResponse
+		var createdAt pgtype.Timestamptz
+
+		err := rows.Scan(
+			&feedback.ID,
+			&feedback.CallID,
+			&feedback.RaterID,
+			&feedback.RatedUserID,
+			&feedback.Stars,
+			&feedback.Behaviour,
+			&feedback.Comment,
+			&createdAt,
+			&feedback.RaterName,
+			&feedback.RaterPic,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning feedback row: %v", err)
+		}
+
+		if createdAt.Valid {
+			feedback.CreatedAt = createdAt.Time.Format("2006-01-02 15:04:05")
+		}
+
+		feedbacks = append(feedbacks, feedback)
+	}
+
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error iterating feedback rows: %v", rows.Err())
+	}
+
+	return feedbacks, nil
+}
+
+func (p *PostgreSQL) GetOtherPeerID(callID string, raterID int64) (int64, error) {
+	query := `
+        SELECT 
+            CASE 
+                WHEN peer1_id = $1 THEN peer2_id
+                WHEN peer2_id = $1 THEN peer1_id
+            END as other_peer_id
+        FROM call_sessions 
+        WHERE id = $2 AND (peer1_id = $1 OR peer2_id = $1)
+    `
+
+	var otherPeerID int64
+	err := p.Db.QueryRow(context.Background(), query, raterID, callID).Scan(&otherPeerID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, fmt.Errorf("call not found or user not part of call")
+		}
+		return 0, fmt.Errorf("error getting other peer id: %v", err)
+	}
+
+	return otherPeerID, nil
 }

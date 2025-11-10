@@ -84,3 +84,25 @@ type AiCharacters struct {
 	Description     string `json:"description"`
 	BackgroundColor string `json:"backgroundColor"`
 }
+
+type CallFeedbackRequest struct {
+	CallID      string   `json:"call_id" binding:"required"`
+	RatedUserID int64    `json:"rated_user_id,omitempty"`
+	Stars       int      `json:"stars" binding:"required,min=1,max=5"`
+	Behaviour   []string `json:"behaviour,omitempty"`
+	Comment     string   `json:"comment,omitempty"`
+	RaterUserID int64    `json:"rater_user_id,omitempty"`
+}
+
+type CallFeedbackResponse struct {
+	ID          string `json:"id"`
+	CallID      string `json:"call_id"`
+	RaterID     int64  `json:"rater_id"`
+	RatedUserID int64  `json:"rated_user_id"`
+	Stars       int    `json:"stars"`
+	Behaviour   string `json:"behaviour,omitempty"`
+	Comment     string `json:"comment,omitempty"`
+	CreatedAt   string `json:"created_at"`
+	RaterName   string `json:"rater_name"`
+	RaterPic    string `json:"rater_pic"`
+}

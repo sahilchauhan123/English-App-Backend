@@ -3,6 +3,7 @@ package userhandler
 import (
 	"fmt"
 	"github/english-app/internal/response"
+	"github/english-app/internal/types"
 	userservice "github/english-app/internal/user/service"
 	"github/english-app/storage"
 	"github/english-app/storage/s3"
@@ -225,6 +226,7 @@ func BlockUserHandler(db storage.Storage) gin.HandlerFunc {
 		blockUserId, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			response.Failed(c, http.StatusBadRequest, err.Error())
+			return
 		}
 
 		userid := c.MustGet("user_id").(int64)
@@ -232,6 +234,7 @@ func BlockUserHandler(db storage.Storage) gin.HandlerFunc {
 		err = db.BlockUser(userid, blockUserId)
 		if err != nil {
 			response.Failed(c, http.StatusBadRequest, err.Error())
+			return
 		}
 
 		response.Success(c, map[string]any{
@@ -268,5 +271,48 @@ func AiCharactersHandler() gin.HandlerFunc {
 			"success":    true,
 			"characters": characters,
 		})
+	}
+}
+
+func SubmitCallFeedbackHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var feedback types.CallFeedbackRequest
+		//validate
+		if err := c.ShouldBindJSON(&feedback); err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		// Get rater ID from context (set by auth middleware)
+		raterID, _ := c.Get("user_id")
+		feedback.RaterUserID = raterID.(int64)
+
+		err := userservice.SaveCallFeedback(feedback, db)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		fmt.Println("done broooooo")
+		response.Success(c, map[string]any{
+			"success": true,
+			"message": "Feedback submitted successfully",
+		})
+	}
+}
+
+func GetCallFeedbackHandler(db storage.Storage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		callID := c.Query("callId")
+		if callID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "call_id is required"})
+			return
+		}
+		feedbacks, err := userservice.GetCallFeedback(callID, db)
+		if err != nil {
+			response.Failed(c, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		response.Success(c, feedbacks)
 	}
 }

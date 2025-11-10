@@ -24,4 +24,7 @@ type Storage interface {
 	BlockUser(userId int64, blockUserId int64) error
 	GetLeaderboard(periodType string) ([]types.LeaderboardEntry, error)
 	UpdateLeaderboard(userID int64, duration float64) error
+	SaveCallFeedback(feedback types.CallFeedbackRequest) error
+	GetCallFeedback(callID string) ([]types.CallFeedbackResponse, error)
+	GetOtherPeerID(callID string, raterID int64) (int64, error)
 }
