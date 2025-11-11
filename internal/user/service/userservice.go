@@ -164,8 +164,8 @@ func SaveCallFeedback(feedback types.CallFeedbackRequest, db storage.Storage) er
 	return nil
 }
 
-func GetCallFeedback(callID string, db storage.Storage) ([]types.CallFeedbackResponse, error) {
-	feedbacks, err := db.GetCallFeedback(callID)
+func GetCallFeedback(userID int64, db storage.Storage) ([]types.CallFeedbackResponse, error) {
+	feedbacks, err := db.GetCallFeedback(userID)
 	if err != nil {
 		return nil, err
 	}

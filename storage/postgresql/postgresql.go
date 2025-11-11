@@ -154,6 +154,14 @@ func New() (*PostgreSQL, error) {
 		return nil, fmt.Errorf("failed to create call_feedback table: %v", err)
 	}
 
+	_, err = conn.Exec(context.Background(), `
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_call_rater ON call_feedback(call_id, rater_id);
+    `)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create unique index on call_feedback: %v", err)
+	}
+
 	err = conn.Ping(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
@@ -635,6 +643,7 @@ func (p *PostgreSQL) SaveCallFeedback(feedback types.CallFeedbackRequest) error 
 
 	RatedUserID, err := p.GetOtherPeerID(feedback.CallID, feedback.RaterUserID)
 	if err != nil {
+		fmt.Println("err in get other peerid", err.Error())
 		return err
 	}
 	feedback.RatedUserID = RatedUserID
@@ -644,6 +653,7 @@ func (p *PostgreSQL) SaveCallFeedback(feedback types.CallFeedbackRequest) error 
             call_id, rater_id, rated_user_id, 
             stars, behaviour, comment
         ) VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (call_id, rater_id) DO NOTHING;
     `
 	_, err = p.Db.Exec(
 		context.Background(),
@@ -657,26 +667,26 @@ func (p *PostgreSQL) SaveCallFeedback(feedback types.CallFeedbackRequest) error 
 	return nil
 }
 
-func (p *PostgreSQL) GetCallFeedback(callID string) ([]types.CallFeedbackResponse, error) {
+func (p *PostgreSQL) GetCallFeedback(userID int64) ([]types.CallFeedbackResponse, error) {
 	query := `
-        SELECT 
-            cf.id,
-            cf.call_id,
-            cf.rater_id,
-            cf.rated_user_id,
-            cf.stars,
-            cf.behaviour,
-            cf.comment,
-            cf.created_at,
-            u.full_name as rater_name,
-            u.profile_pic as rater_pic
-        FROM call_feedback cf
-        JOIN users u ON cf.rater_id = u.id
-        WHERE cf.call_id = $1
-        ORDER BY cf.created_at DESC;
-    `
-
-	rows, err := p.Db.Query(context.Background(), query, callID)
+		SELECT 
+			cf.id,
+			cf.call_id,
+			cf.rater_id,
+			cf.rated_user_id,
+			cf.stars,
+			cf.behaviour,
+			cf.comment,
+			cf.created_at,
+			u.full_name as rater_name,
+			u.profile_pic as rater_pic
+		FROM call_feedback cf
+		JOIN users u ON cf.rater_id = u.id
+		WHERE cf.rated_user_id = $1
+		ORDER BY cf.created_at DESC
+		LIMIT 25;
+	`
+	rows, err := p.Db.Query(context.Background(), query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching call feedback: %v", err)
 	}

@@ -302,12 +302,10 @@ func SubmitCallFeedbackHandler(db storage.Storage) gin.HandlerFunc {
 
 func GetCallFeedbackHandler(db storage.Storage) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		callID := c.Query("callId")
-		if callID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "call_id is required"})
-			return
-		}
-		feedbacks, err := userservice.GetCallFeedback(callID, db)
+
+		userId := c.MustGet("user_id").(int64)
+
+		feedbacks, err := userservice.GetCallFeedback(userId, db)
 		if err != nil {
 			response.Failed(c, http.StatusBadRequest, err.Error())
 			return
