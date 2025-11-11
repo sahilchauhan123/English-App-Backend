@@ -99,7 +99,7 @@ func main() {
 		userGroup.GET("/leaderboard", userhandler.LeaderboardHandler(storage))
 		userGroup.GET("/aicharacters", userhandler.AiCharactersHandler())
 		userGroup.POST("/upload/feedback", userhandler.SubmitCallFeedbackHandler(storage))
-		userGroup.GET("/get/feeback", userhandler.GetCallFeedbackHandler(storage))
+		userGroup.GET("/get/feedback", userhandler.GetCallFeedbackHandler(storage))
 	}
 	port := os.Getenv("PORT")
 	if port == "" {
