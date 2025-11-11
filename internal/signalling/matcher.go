@@ -745,9 +745,8 @@ func handleClient(conn *websocket.Conn, db storage.Storage) {
 			}
 			// add Start call details to Database
 			go func() {
-				mutex.Lock()
-				defer mutex.Unlock()
 				callId, err := db.StartCall(allClientsData[msg.Target], allClientsData[msg.From])
+
 				if err != nil {
 					fmt.Println("error in start call ", err)
 				}
@@ -916,8 +915,6 @@ func maximumWaitingTimeExceededChecker(uid int64) {
 	}
 }
 func ShowRelatedUsersList(id int64) ([]types.User, error) {
-	mutex.RLock()
-	defer mutex.RUnlock()
 	var msg []types.User
 	maxCounter := 0
 	fmt.Println("online users : ", len(availableClientsData))
@@ -957,12 +954,12 @@ func StartUserChecker() {
 						if !c.isAlive() {
 							fmt.Println("removing user after 15 sec", allClientsData[id].FullName)
 							mutex.Lock()
-							defer mutex.Unlock()
 							delete(clients, uid)
 							delete(availableClientsData, uid)
 							delete(inCallClientsData, uid)
 							delete(waitingForCallClients, uid)
 							delete(allClientsData, uid)
+							mutex.Unlock()
 							c.Conn.Close()
 							close(c.Send)
 						}
